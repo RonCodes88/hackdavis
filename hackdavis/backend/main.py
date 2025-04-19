@@ -1,10 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from letta_client import Letta
 from pydantic import BaseModel
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import threading
 import os
 from supabase import create_client, Client
@@ -284,13 +284,36 @@ async def serve_original_image(filename: str):  # Renamed function
     
     return FileResponse(str(file_path))
 
+detection_data = {1: {'label': 'pasta sauce', 'box': [290, 379, 396, 590]}, 2: {'label': 'pasta sauce', 'box': [391, 387, 497, 591]}, 3: {'label': 'peanut butter', 'box': [192, 683, 283, 852]}, 4: {'label': 'ichiban ramen noodles', 'box': [456, 55, 557, 288]}, 5: {'label': 'dark chocolate peanut butter bar', 'box': [490, 382, 597, 601]}, 6: {'label': 'peanut butter', 'box': [193, 620, 289, 772]}, 7: {'label': 'chicken broth', 'box': [329, 0, 465, 242]}, 8: {'label': 'whole grain pasta elbows', 'box': [35, 216, 136, 248]}, 9: {'label': 'chicken broth', 'box': [11, 617, 600, 897]}, 10: {'label': 'white beans', 'box': [181, 352, 303, 581]}, 11: {'label': 'whole grain pasta elbows', 'box': [157, 21, 327, 290]}, 12: {'label': 'chicken broth', 'box': [285, 624, 348, 851]}, 13: {'label': 'whole grain pasta elbows', 'box': [0, 114, 165, 288]}, 14: {'label': 'dark chocolate peanut butter bar', 'box': [485, 382, 598, 602]}, 15: {'label': 'dark chocolate peanut butter bar', 'box': [343, 622, 408, 849]}, 16: {'label': 'whole grain pasta elbows', 'box': [0, 0, 599, 766]}, 17: {'label': 'white beans', 'box': [184, 357, 303, 579]}, 18: {'label': 'ichiban ramen noodles', 'box': [458, 33, 595, 286]}, 19: {'label': 'whole grain pasta elbows', 'box': [0, 14, 327, 295]}, 20: {'label': 'whole grain pasta elbows', 'box': [33, 216, 136, 248]}, 21: {'label': 'Whole grain pasta elbows', 'box': [480, 332, 598, 378]}, 22: {'label': 'white beans', 'box': [184, 357, 302, 579]}, 23: {'label': 'Ichiban ramen noodles', 'box': [14, 311, 108, 381]}, 24: {'label': 'whole grain pasta elbows', 'box': [0, 29, 163, 289]}, 25: {'label': 'whole grain pasta elbows', 'box': [156, 115, 315, 283]}, 26: {'label': 'peanut butter', 'box': [322, 314, 489, 409]}, 27: {'label': 'chicken broth', 'box': [461, 31, 598, 222]}, 28: {'label': 'chicken broth', 'box': [45, 617, 192, 814]}}
 
 @app.get("/get-detections/{filename}")
 async def get_detections(filename: str):
     # Example format
-    detection_data = {1: {'label': 'sauce', 'box': [290, 379, 396, 590]}, 2: {'label': 'sauce', 'box': [391, 387, 497, 591]}, 3: {'label': 'peanutbutter', 'box': [192, 683, 283, 852]}, 4: {'label': 'pasta', 'box': [80, 773, 188, 849]}, 5: {'label': 'pasta', 'box': [456, 55, 557, 288]}, 6: {'label': 'chocolate', 'box': [490, 382, 597, 601]}, 7: {'label': 'peanutbutter', 'box': [193, 620, 289, 772]}, 8: {'label': 'broth', 'box': [329, 0, 465, 242]}, 9: {'label': 'pasta', 'box': [35, 216, 136, 248]}, 10: {'label': 'noodles', 'box': [11, 617, 600, 897]}, 11: {'label': 'noodles', 'box': [191, 619, 289, 723]}, 12: {'label': 'beans', 'box': [181, 352, 303, 581]}, 13: {'label': 'elbows', 'box': [157, 21, 327, 290]}, 14: {'label': 'broth', 'box': [285, 624, 348, 851]}, 15: {'label': 'beans', 'box': [0, 308, 600, 891]}, 16: {'label': 'peanutbutter', 'box': [201, 221, 285, 253]}, 17: {'label': 'pasta', 'box': [210, 161, 257, 202]}, 18: {'label': 'elbows', 'box': [0, 114, 165, 288]}, 19: {'label': 'chocolate', 'box': [485, 382, 598, 602]}, 20: {'label': 'noodles', 'box': [343, 622, 408, 849]}, 21: {'label': 'pasta', 'box': [390, 197, 454, 268]}, 22: {'label': 'pasta', 'box': [0, 0, 599, 766]}, 23: {'label': 'beans', 'box': [4, 296, 600, 900]}, 24: {'label': 'pasta', 'box': [257, 223, 285, 252]}, 25: {'label': 'beans', 'box': [184, 357, 303, 579]}, 26: {'label': 'pasta', 'box': [458, 33, 595, 286]}, 27: {'label': 'pasta', 'box': [56, 155, 105, 196]}, 28: {'label': 'elbows', 'box': [0, 14, 327, 295]}, 29: {'label': 'elbows', 'box': [33, 216, 136, 248]}, 30: {'label': 'elbows', 'box': [480, 332, 598, 378]}, 31: {'label': 'sauce', 'box': [363, 247, 390, 270]}, 32: {'label': 'beans', 'box': [184, 357, 302, 579]}, 33: {'label': 'sauce', 'box': [14, 311, 108, 381]}, 34: {'label': 'ramen', 'box': [131, 802, 184, 834]}, 35: {'label': 'elbows', 'box': [0, 29, 163, 289]}, 36: {'label': 'elbows', 'box': [156, 115, 315, 283]}, 37: {'label': 'noodles', 'box': [322, 314, 489, 409]}, 38: {'label': 'pasta', 'box': [461, 31, 598, 222]}, 39: {'label': 'broth', 'box': [45, 617, 192, 814]}}
     
     return detection_data
+
+class BoxData(BaseModel):
+    label: str
+    box: List[int]
+
+@app.post("/add-detection/{filename}")
+async def add_detection(filename: str, request: Request):
+    body = await request.json()
+    new_id = body["id"]
+    data = body["data"]
+    detection_data[new_id] = {
+        "label": data["label"],
+        "box": data["box"]
+    }
+    return {"message": "Detection added", "id": new_id}
+
+@app.delete("/remove-detection/{id}")
+async def remove_detection(id: int):
+    if id in detection_data:
+        del detection_data[id]
+        return {"message": f"Detection with ID {id} removed"}
+    else:
+        raise HTTPException(status_code=404, detail="Detection not found")
   
 @app.post("/push-emergency-request")
 async def handle_emergency_request(request: EmergencyRequest):

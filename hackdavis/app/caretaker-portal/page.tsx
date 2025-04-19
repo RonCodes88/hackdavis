@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { ImageUpload } from "@/components/ui/image-processor";
 import ExampleUsagePage from "@/components/ui/image-page";
 import { FaExclamationTriangle } from "react-icons/fa";
+import { Button } from "@/components/ui/button";
 
 // Define the emergency request type
 interface EmergencyRequest {
@@ -38,7 +39,9 @@ export default function CaretakerPortal() {
   // Function to fetch emergency requests from backend
   const fetchEmergencyRequests = async () => {
     try {
-      const response = await fetch("http://localhost:8000/get-emergency-requests");
+      const response = await fetch(
+        "http://localhost:8000/get-emergency-requests"
+      );
 
       if (!response.ok) {
         throw new Error(`API returned status code: ${response.status}`);
@@ -316,7 +319,14 @@ export default function CaretakerPortal() {
           </main>
         )}
 
-        {activeTab == "interact" && <ExampleUsagePage></ExampleUsagePage>}
+        {activeTab == "interact" && (
+          <div>
+            <ExampleUsagePage
+              onGenerateRecipes={() => setActiveTab("recipe")}
+              buttonText="Generate Recipes from Ingredients"
+            />
+          </div>
+        )}
 
         {activeTab === "kitchen" && (
           <div className="container mx-auto">
