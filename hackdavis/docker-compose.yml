@@ -1,0 +1,51 @@
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Password for your postgres user
+    ports:
+      - "5436:5432"
+    volumes:
+      - db:/var/lib/postgresql/data
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+      PGADMIN_CONFIG_CHECK_EMAIL_DELIVERABILITY: "False"
+      PGADMIN_CONFIG_ALLOW_SPECIAL_EMAIL_DOMAINS: "True"
+    ports:
+      - "5002:80"
+    depends_on:
+      - db
+  pgvector: 
+    image: ankane/pgvector
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD} # Same password as the db service
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgvector_data:/var/lib/postgresql/data
+    depends_on:
+      - db
+  letta:
+    image: letta/letta:latest
+    restart: always
+    environment:
+        OPENAI_API_KEY: ${OPENAI_API_KEY}
+        ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+        PROVIDER: anthropic
+        DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+    ports:
+      - "8283:8283"
+    depends_on:
+      - db
+
+volumes:
+  db:
+    driver: local
+  pgvector_data:
+    driver: local

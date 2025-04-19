@@ -1,0 +1,148 @@
+from pydantic import BaseModel
+from caretaker_manager import create_caretaker_agent
+from typing import Optional
+import os
+from supabase import create_client, Client
+from helper import load_env
+import anthropic
+from collections import Counter
+from cerebras.cloud.sdk import Cerebras
+
+anthropic_client = anthropic.Anthropic()
+load_env()
+client = Cerebras(api_key=os.environ.get("CEREBRAS_API_KEY"))
+SUPABASE_URL=os.getenv("URL")
+SUPABASE_KEY=os.getenv("anon_public")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
+
+class ResidentInfo(BaseModel):
+    name: str
+    password: str
+    age: Optional[int] = None  
+    medicalConditions: Optional[str] = None  
+    medications: Optional[str] = None  
+    foodAllergies: Optional[str] = None  
+    specialSupportiveServices: Optional[str] = None  
+
+def ingredients_str_parser(ingredients_str: str):
+    counted_ingredients = Counter([ingredient.lower().strip() for ingredient in ingredients_str.split(',')])
+    lines = [f"{ingredient}: {count}" for ingredient, count in counted_ingredients.items()]
+    return "\n".join(lines)
+
+# def generate_recipe(resident_info: ResidentInfo, ingredients_str: str, meal_type: str = None, substitution_allowed: bool = False):
+#     r_info_text = (
+#     f"Name: {resident_info.name}, "
+#     f"Age: {resident_info.age}, "
+#     f"Medical Conditions: {resident_info.medicalConditions}, "
+#     f"Medications: {resident_info.medications}, "
+#     f"Food Allergies: {resident_info.foodAllergies}, "
+#     f"Special Supportive Services: {resident_info.specialSupportiveServices}")
+
+
+
+
+#     message = anthropic_client.messages.create(
+#     model="claude-3-7-sonnet-20250219",
+#     max_tokens=1500,
+#     temperature=1,
+#     system="""
+#     Your important role is to generate healthy recipes for patients in a senior home. Each patient has unique dietary needs, which you must carefully follow. Ideally, recipes should be healthy, filling, and easy to prepare.
+
+#     I will provide:
+#     - Individual characteristics in the format: Characteristic: value (e.g., Diabetic: Yes, Dislikes: Garlic)
+#     - Pantry contents in the format: 
+#       "Item: Quantity" per line. For example:
+#       Potato: 2  
+#       Carrot: 1  
+#       Egg: 3
+#     - (Optional) A meal type such as “Breakfast” or “Snack”. If "None", assume it's for a standard meal.
+#     - If substituions are allowed
+
+#     You must:
+#     - Only use ingredients from the pantry unless substitutions are explicitly allowed (Assume they at least have salt, pepper, and oil but no other seasonings unless stated). Write down if substitutions are used.
+#     - Treat health conditions seriously if present (e.g., allergies or diseases)
+#     - Prefer simple, low-effort recipes suited to caretakers
+#     - Assume the recipe is for one person unless otherwise noted. If I specify this is for multiple individuals, generate a scalable recipe or note the portions.
+
+#     Please format your response with the following sections:
+#     1. Recipe Name
+#     2. Ingredients List (with quantities)
+#     3. Instructions
+#     4. Notes (Explain how this recipe addresses the individual's needs)
+#     """,
+#     messages=[
+#         {
+#             "role": "user",
+#             "content": [
+#                 {
+#                     "type": "text",
+#                     "text": r_info_text + "\n" + ingredients_str_parser(ingredients_str) + "\nMeal Type:" + meal_type + "\nSubstitions Allowed:" + str(substitution_allowed)
+#                 }
+#             ]
+#         }
+#     ]
+#     )
+#     return message.content[0].text
+
+#Replace above with below when we get the cerebras API
+def generate_recipe(resident_info: ResidentInfo, ingredients_str: str, meal_type: str = None, substitution_allowed: bool = False):
+    r_info_text = (
+    f"Name: {resident_info.name}, "
+    f"Age: {resident_info.age}, "
+    f"Medical Conditions: {resident_info.medicalConditions}, "
+    f"Medications: {resident_info.medications}, "
+    f"Food Allergies: {resident_info.foodAllergies}, "
+    f"Special Supportive Services: {resident_info.specialSupportiveServices}")
+
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": '''Your important role is to generate healthy recipes for patients in a senior home. Each patient has unique dietary needs, which you must carefully follow. Ideally, recipes should be healthy, filling, and easy to prepare.
+
+                I will provide:
+                - Individual characteristics in the format: Characteristic: value (e.g., Diabetic: Yes, Dislikes: Garlic)
+                - Pantry contents in the format: 
+                "Item: Quantity" per line. For example:
+                Potato: 2  
+                Carrot: 1  
+                Egg: 3
+                - (Optional) A meal type such as “Breakfast” or “Snack”. If "None", assume it's for a standard meal.
+                - If substituions are allowed
+
+                You must:
+                - Only use ingredients from the pantry unless substitutions are explicitly allowed (Assume they at least have salt, pepper, and oil but no other seasonings unless stated). Write down if substitutions are used.
+                - Treat health conditions seriously if present (e.g., allergies or diseases)
+                - Prefer simple, low-effort recipes suited to caretakers
+                - Assume the recipe is for one person unless otherwise noted. If I specify this is for multiple individuals, generate a scalable recipe or note the portions.
+
+                Please format your response with the following sections:
+                1. Recipe Name
+                2. Ingredients List (with quantities)
+                3. Instructions
+                4. Notes (Explain how this recipe addresses the individual's needs)
+                '''
+            },
+            {
+                "role": "user",
+                "content": r_info_text + "\n" + ingredients_str_parser(ingredients_str) + "\nMeal Type:" + meal_type + "\nSubstitions Allowed:" + str(substitution_allowed)
+            }
+        ],
+        temperature = 1.0,
+        max_tokens = 1500,
+        model= 'llama-4-scout-17b-16e-instruct'
+    )
+    return chat_completion.choices[0].message.content
+   
+
+test_resident = ResidentInfo(
+    name="John Doe",
+    password='Bruh',
+    age=78, 
+    medicalConditions="Diabetes, Hypertension", 
+    medications="Metformin, Lisinopril",
+    foodAllergies="Dairy",
+    specialSupportiveServices="Assistance with daily insulin shots")
+
+# print("This is the recipe below\n", generate_recipe(test_resident, "rice, cabbage, egg ,Egg", 'Dinner'), sep = '')
+print("This is the recipe below\n", generate_recipe(test_resident, "rice, carrot, tomato, egg, beef", 'Dinner'), sep = '')
