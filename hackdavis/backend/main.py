@@ -12,8 +12,9 @@ import shutil
 from helper import load_env
 from model.generate import run_all
 from datetime import datetime
-from caretaker_manager import create_caretaker_agent
+# from caretaker_manager import create_caretaker_agent
 from pathlib import Path
+from cerebras_agent import create_caretaker_profile, get_agent_response
 
 # Define base directory and paths
 BASE_DIR = Path(__file__).parent
@@ -35,7 +36,7 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
-client = Letta(base_url="http://localhost:8283")
+# client = Letta(base_url="http://localhost:8283")
 load_env()
 SUPABASE_URL=os.getenv("URL")
 SUPABASE_KEY=os.getenv("anon_public")
@@ -64,15 +65,28 @@ class EmergencyRequest(BaseModel):
 def login(request: LoginRequest):
     try:
         # Query the Supabase table for the resident with the given name and password
-        # Kenny: Make this better
         result = supabase.table("residents").select("*").eq("name", request.name).eq("password", request.password).execute()
         
-
-
         if result.data and len(result.data) > 0:
             resident = result.data[0]
             agent_id = resident.get("agent_id")
             resident_id = resident.get("id")
+
+            # Get a welcome message from the AI agent
+            resident_info = {
+                "name": resident.get("name"),
+                "age": resident.get("age"),
+                "medical_conditions": resident.get("medical_conditions"),
+                "medications": resident.get("medications"),
+                "food_allergies": resident.get("food_allergies"),
+                "special_supportive_services": resident.get("special_supportive_services")
+            }
+            
+            welcome_message = get_agent_response(
+                agent_id, 
+                f"Hello, I'm logging in as {request.name}. Please give me a brief welcome message.",
+                resident_info
+            )
 
             agent_dict = {
                 "id": agent_id,
@@ -84,24 +98,19 @@ def login(request: LoginRequest):
                 "message": "Caretaker found in db",
                 "agent": agent_dict,
                 "resident_id": resident_id,
-                "resident_name": resident.get("name")
+                "resident_name": resident.get("name"),
+                "welcome_message": welcome_message,
+                "is_cerebras_agent": True
             }
         else:
             return {"success": False, "message": "Invalid name or PIN"}
     except Exception as e:
         print(f"Error during login: {e}")
         raise HTTPException(status_code=500, detail="An error occurred during login")
-    
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello World"}
-
+# Modify the assign-caretaker endpoint
 @app.post("/assign-caretaker")
 def assign_caretaker(resident_info: ResidentInfo):
-    # Generate the identifier key
-    identifier_key = f"user_{resident_info.name.lower().replace(' ', '_')}"
-    
     # First check if resident already exists in Supabase
     try:
         existing_resident = supabase.table("residents").select("*").eq("name", resident_info.name).execute()
@@ -127,35 +136,11 @@ def assign_caretaker(resident_info: ResidentInfo):
     
     # If we get here, the resident doesn't exist yet
     
-    # Try to find an existing identity
-    try:
-        existing_identities = client.identities.list(identifier_key=identifier_key)
-        if existing_identities:
-            # Use the existing identity
-            identity = existing_identities[0]
-            print(f"Found existing identity: {identity.id} for {identifier_key}")
-        else:
-            # Create a new identity if none exists
-            identity = client.identities.create(
-                identifier_key=identifier_key,
-                name=resident_info.name,
-                identity_type="user"
-            )
-            print(f"Created new identity: {identity.id} for {identifier_key}")
-    except Exception as e:
-        print(f"Error with identity: {e}")
-        # If we can't get or create an identity with the standard key,
-        # we'll just continue without a unique identifier approach
-        return {
-            "message": "Failed to create identity",
-            "error": str(e)
-        }
+    # Create a caretaker agent profile using Cerebras
+    caretaker_agent = create_caretaker_profile(resident_info.model_dump())
+    print(f"Created caretaker agent profile for {resident_info.name}")
 
-    # Create a caretaker agent for the resident
-    caretaker_agent = create_caretaker_agent(resident_info.model_dump(), identity.id)
-    print(f"Created caretaker agent for {resident_info.name}")
-
-    agent_id = getattr(caretaker_agent, "id", None)
+    agent_id = caretaker_agent["id"]
     
     try:
         # Prepare data for Supabase insert
@@ -167,7 +152,6 @@ def assign_caretaker(resident_info: ResidentInfo):
             "medications": resident_info.medications,
             "food_allergies": resident_info.foodAllergies,
             "special_supportive_services": resident_info.specialSupportiveServices,
-            "identity_id": identity.id,
             "agent_id": agent_id
         }
         
@@ -186,17 +170,19 @@ def assign_caretaker(resident_info: ResidentInfo):
             resident_id = None
             print("Resident added but couldn't retrieve ID")
         
-        # Convert agent to dictionary for response
-        agent_dict = {
-            "id": agent_id,
-            "name": getattr(caretaker_agent, "name", f"Caretaker for {resident_info.name}")
-        }
+        # Generate a welcome message with the new caretaker
+        welcome_message = get_agent_response(
+            agent_id, 
+            f"You have just been assigned as the caretaker for {resident_info.name}. Please introduce yourself briefly.",
+            resident_info.model_dump()
+        )
         
         return {
             "message": "Caretaker assigned successfully", 
-            "agent": agent_dict,
+            "agent": caretaker_agent,
             "resident_id": resident_id,
-            "resident_name": resident_info.name
+            "resident_name": resident_info.name,
+            "welcome_message": welcome_message
         }
         
     except Exception as e:
@@ -204,14 +190,9 @@ def assign_caretaker(resident_info: ResidentInfo):
         import traceback
         traceback.print_exc()
         
-        # Convert agent to dictionary for response
-        agent_dict = {
-            "id": agent_id,
-            "name": getattr(caretaker_agent, "name", f"Caretaker for {resident_info.name}")
-        }
-        
         # Return a response without the resident_id
-        return {"message": "Caretaker assigned but database storage failed", "agent": agent_dict, "error": str(e)}
+        return {"message": "Caretaker assigned but database storage failed", "agent": caretaker_agent, "error": str(e)}
+
     
 processing_status: Dict[str, str] = {}
 
