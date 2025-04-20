@@ -27,7 +27,7 @@ export default function Home() {
         <div className="container mx-auto flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
           <div className="flex gap-2 items-center text-lg font-bold text-red-600">
             <HeartPulse className="h-6 w-6 text-red-600" />
-            <span>Personalized AI Assistant</span>
+            <span>InstaCare</span>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-4">
             <nav className="flex items-center space-x-1 gap-2">
