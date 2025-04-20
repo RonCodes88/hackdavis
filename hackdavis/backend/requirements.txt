@@ -9,6 +9,7 @@ asttokens==3.0.0
 attrs==25.3.0
 blinker==1.9.0
 cachetools==5.5.2
+cerebras_cloud_sdk
 certifi==2025.1.31
 charset-normalizer==3.4.1
 click==8.1.8
@@ -65,7 +66,7 @@ multidict==6.4.3
 mypy-extensions==1.0.0
 narwhals==1.35.0
 networkx==3.4.2
-numpy==2.2.4
+numpy>=1.23,<2.1.1
 openai==1.75.0
 opencv-python==4.11.0.86
 orjson==3.10.16
@@ -145,3 +146,9 @@ wcwidth==0.2.13
 websockets==12.0
 yarl==1.19.0
 zstandard==0.23.0
+langchain
+langchain-cerebras
+langchain-core
+langchain-community
+duckduckgo-search
+cerebras_cloud_sdk

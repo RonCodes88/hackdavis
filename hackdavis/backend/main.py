@@ -13,6 +13,7 @@ from helper import load_env
 from model.generate import run_all
 from datetime import datetime
 from caretaker_manager import create_caretaker_agent
+from recipe_generator import generate_recipe
 from pathlib import Path
 
 # Define base directory and paths
@@ -39,7 +40,7 @@ client = Letta(base_url="http://localhost:8283")
 load_env()
 SUPABASE_URL=os.getenv("URL")
 SUPABASE_KEY=os.getenv("anon_public")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 class ResidentInfo(BaseModel):
     name: str
@@ -360,7 +361,18 @@ async def get_emergency_requests():
             status_code=500, 
             detail="Failed to fetch emergency requests"
         )
-   
+
+
+test_resident = ResidentInfo(
+    name="John Doe",
+    password='Bruh',
+    age=78, 
+    medicalConditions="Diabetes, Hypertension", 
+    medications="Metformin, Lisinopril",
+    foodAllergies="Dairy",
+    specialSupportiveServices="Assistance with daily insulin shots")
+
+print("This is the recipe below\n", generate_recipe(test_resident, "beans, cheese, ground beef, rice, soy sauce, milk, brocoli", 'Dinner'), sep = '')
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
