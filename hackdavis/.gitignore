@@ -45,5 +45,5 @@ next-env.d.ts
 /backend/davis-venv/
 /backend/__pycache__/
 /backend/skadoosh/
-
+.DS_Store
 hackdavis/anthropic-API.ipynb
