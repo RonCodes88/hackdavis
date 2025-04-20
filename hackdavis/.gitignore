@@ -43,7 +43,8 @@ yarn-error.log*
 next-env.d.ts
 
 /backend/davis-venv/
-/backend/__pycache__/
+/backend/model/__pycache__/
 /backend/skadoosh/
+/backend/__pycache__/
 
 hackdavis/anthropic-API.ipynb
