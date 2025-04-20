@@ -1,10 +1,10 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import FileResponse
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from letta_client import Letta
 from pydantic import BaseModel
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 import threading
 import os
 from supabase import create_client, Client
@@ -12,9 +12,8 @@ import shutil
 from helper import load_env
 from model.generate import run_all
 from datetime import datetime
-from recipe_generator import generate_recipe 
 from pathlib import Path
-from cerebras_agent import create_caretaker_profile, get_agent_response
+from recipe_generator import get_dict
 
 # Define base directory and paths
 BASE_DIR = Path(__file__).parent
@@ -66,7 +65,6 @@ def login(request: LoginRequest):
     try:
         # Query the Supabase table for the resident with the given name and password
         result = supabase.table("residents").select("*").eq("name", request.name).eq("password", request.password).execute()
-        
         if result.data and len(result.data) > 0:
             resident = result.data[0]
             agent_id = resident.get("agent_id")
@@ -81,26 +79,12 @@ def login(request: LoginRequest):
                 "food_allergies": resident.get("food_allergies"),
                 "special_supportive_services": resident.get("special_supportive_services")
             }
-            
-            welcome_message = get_agent_response(
-                agent_id, 
-                f"Hello, I'm logging in as {request.name}. Please give me a brief welcome message.",
-                resident_info
-            )
-
-            agent_dict = {
-                "id": agent_id,
-                "name": f"Caretaker for {resident.get('name')}"
-            }
 
             return {
                 "success": True,
                 "message": "Caretaker found in db",
-                "agent": agent_dict,
                 "resident_id": resident_id,
                 "resident_name": resident.get("name"),
-                "welcome_message": welcome_message,
-                "is_cerebras_agent": True
             }
         else:
             return {"success": False, "message": "Invalid name or PIN"}
@@ -111,6 +95,7 @@ def login(request: LoginRequest):
 # Modify the assign-caretaker endpoint
 @app.post("/assign-caretaker")
 def assign_caretaker(resident_info: ResidentInfo):
+    print("I am here")
     # First check if resident already exists in Supabase
     try:
         existing_resident = supabase.table("residents").select("*").eq("name", resident_info.name).execute()
@@ -125,22 +110,12 @@ def assign_caretaker(resident_info: ResidentInfo):
             # Create a response with the existing data
             return {
                 "message": "Resident already exists",
-                "agent": {
-                    "id": resident.get("agent_id"),
-                    "name": f"Caretaker for {resident_info.name}"
-                },
                 "resident_id": resident.get("id")
             }
     except Exception as e:
         print(f"Error checking if resident exists: {e}")
     
     # If we get here, the resident doesn't exist yet
-    
-    # Create a caretaker agent profile using Cerebras
-    caretaker_agent = create_caretaker_profile(resident_info.model_dump())
-    print(f"Created caretaker agent profile for {resident_info.name}")
-
-    agent_id = caretaker_agent["id"]
     
     try:
         # Prepare data for Supabase insert
@@ -152,11 +127,12 @@ def assign_caretaker(resident_info: ResidentInfo):
             "medications": resident_info.medications,
             "food_allergies": resident_info.foodAllergies,
             "special_supportive_services": resident_info.specialSupportiveServices,
-            "agent_id": agent_id
+            "emergency_requested": False
         }
         
         # Insert into Supabase table
         result = supabase.table("residents").insert(resident_data).execute()
+        print(f"Supabase insertion result: {result}")
         
         # Check for errors in the response
         if hasattr(result, 'error') and result.error:
@@ -170,19 +146,10 @@ def assign_caretaker(resident_info: ResidentInfo):
             resident_id = None
             print("Resident added but couldn't retrieve ID")
         
-        # Generate a welcome message with the new caretaker
-        welcome_message = get_agent_response(
-            agent_id, 
-            f"You have just been assigned as the caretaker for {resident_info.name}. Please introduce yourself briefly.",
-            resident_info.model_dump()
-        )
-        
         return {
             "message": "Caretaker assigned successfully", 
-            "agent": caretaker_agent,
             "resident_id": resident_id,
             "resident_name": resident_info.name,
-            "welcome_message": welcome_message
         }
         
     except Exception as e:
@@ -191,7 +158,7 @@ def assign_caretaker(resident_info: ResidentInfo):
         traceback.print_exc()
         
         # Return a response without the resident_id
-        return {"message": "Caretaker assigned but database storage failed", "agent": caretaker_agent, "error": str(e)}
+        return {"message": "Caretaker assigned but database storage failed", "error": str(e)}
 
     
 processing_status: Dict[str, str] = {}
@@ -266,12 +233,44 @@ async def serve_original_image(filename: str):  # Renamed function
     return FileResponse(str(file_path))
 
 
+detection_data = {1: {'label': 'pasta sauce', 'box': [290, 379, 396, 590]}, 2: {'label': 'pasta sauce', 'box': [391, 387, 497, 591]}, 3: {'label': 'peanut butter', 'box': [192, 683, 283, 852]}, 4: {'label': 'ichiban ramen noodles', 'box': [456, 55, 557, 288]}, 5: {'label': 'dark chocolate peanut butter bar', 'box': [490, 382, 597, 601]}, 6: {'label': 'peanut butter', 'box': [193, 620, 289, 772]}, 7: {'label': 'chicken broth', 'box': [329, 0, 465, 242]}, 8: {'label': 'whole grain pasta elbows', 'box': [35, 216, 136, 248]}, 9: {'label': 'chicken broth', 'box': [11, 617, 600, 897]}, 10: {'label': 'white beans', 'box': [181, 352, 303, 581]}, 11: {'label': 'whole grain pasta elbows', 'box': [157, 21, 327, 290]}, 12: {'label': 'chicken broth', 'box': [285, 624, 348, 851]}, 13: {'label': 'whole grain pasta elbows', 'box': [0, 114, 165, 288]}, 14: {'label': 'dark chocolate peanut butter bar', 'box': [485, 382, 598, 602]}, 15: {'label': 'dark chocolate peanut butter bar', 'box': [343, 622, 408, 849]}, 16: {'label': 'whole grain pasta elbows', 'box': [0, 0, 599, 766]}, 17: {'label': 'white beans', 'box': [184, 357, 303, 579]}, 18: {'label': 'ichiban ramen noodles', 'box': [458, 33, 595, 286]}, 19: {'label': 'whole grain pasta elbows', 'box': [0, 14, 327, 295]}, 20: {'label': 'whole grain pasta elbows', 'box': [33, 216, 136, 248]}, 21: {'label': 'Whole grain pasta elbows', 'box': [480, 332, 598, 378]}, 22: {'label': 'white beans', 'box': [184, 357, 302, 579]}, 23: {'label': 'Ichiban ramen noodles', 'box': [14, 311, 108, 381]}, 24: {'label': 'whole grain pasta elbows', 'box': [0, 29, 163, 289]}, 25: {'label': 'whole grain pasta elbows', 'box': [156, 115, 315, 283]}, 26: {'label': 'peanut butter', 'box': [322, 314, 489, 409]}, 27: {'label': 'chicken broth', 'box': [461, 31, 598, 222]}, 28: {'label': 'chicken broth', 'box': [45, 617, 192, 814]}}
+
+@app.get("/refresh-detections/{filename}")
+async def refresh_detections(filename: str):
+    global detection_data  # Reference the global variable
+    detection_data = {1: {'label': 'pasta sauce', 'box': [290, 379, 396, 590]}, 2: {'label': 'pasta sauce', 'box': [391, 387, 497, 591]}, 3: {'label': 'peanut butter', 'box': [192, 683, 283, 852]}, 4: {'label': 'ichiban ramen noodles', 'box': [456, 55, 557, 288]}, 5: {'label': 'dark chocolate peanut butter bar', 'box': [490, 382, 597, 601]}, 6: {'label': 'peanut butter', 'box': [193, 620, 289, 772]}, 7: {'label': 'chicken broth', 'box': [329, 0, 465, 242]}, 8: {'label': 'whole grain pasta elbows', 'box': [35, 216, 136, 248]}, 9: {'label': 'chicken broth', 'box': [11, 617, 600, 897]}, 10: {'label': 'white beans', 'box': [181, 352, 303, 581]}, 11: {'label': 'whole grain pasta elbows', 'box': [157, 21, 327, 290]}, 12: {'label': 'chicken broth', 'box': [285, 624, 348, 851]}, 13: {'label': 'whole grain pasta elbows', 'box': [0, 114, 165, 288]}, 14: {'label': 'dark chocolate peanut butter bar', 'box': [485, 382, 598, 602]}, 15: {'label': 'dark chocolate peanut butter bar', 'box': [343, 622, 408, 849]}, 16: {'label': 'whole grain pasta elbows', 'box': [0, 0, 599, 766]}, 17: {'label': 'white beans', 'box': [184, 357, 303, 579]}, 18: {'label': 'ichiban ramen noodles', 'box': [458, 33, 595, 286]}, 19: {'label': 'whole grain pasta elbows', 'box': [0, 14, 327, 295]}, 20: {'label': 'whole grain pasta elbows', 'box': [33, 216, 136, 248]}, 21: {'label': 'Whole grain pasta elbows', 'box': [480, 332, 598, 378]}, 22: {'label': 'white beans', 'box': [184, 357, 302, 579]}, 23: {'label': 'Ichiban ramen noodles', 'box': [14, 311, 108, 381]}, 24: {'label': 'whole grain pasta elbows', 'box': [0, 29, 163, 289]}, 25: {'label': 'whole grain pasta elbows', 'box': [156, 115, 315, 283]}, 26: {'label': 'peanut butter', 'box': [322, 314, 489, 409]}, 27: {'label': 'chicken broth', 'box': [461, 31, 598, 222]}, 28: {'label': 'chicken broth', 'box': [45, 617, 192, 814]}}
+    return detection_data
+
+
 @app.get("/get-detections/{filename}")
 async def get_detections(filename: str):
     # Example format
-    detection_data = {1: {'label': 'sauce', 'box': [290, 379, 396, 590]}, 2: {'label': 'sauce', 'box': [391, 387, 497, 591]}, 3: {'label': 'peanutbutter', 'box': [192, 683, 283, 852]}, 4: {'label': 'pasta', 'box': [80, 773, 188, 849]}, 5: {'label': 'pasta', 'box': [456, 55, 557, 288]}, 6: {'label': 'chocolate', 'box': [490, 382, 597, 601]}, 7: {'label': 'peanutbutter', 'box': [193, 620, 289, 772]}, 8: {'label': 'broth', 'box': [329, 0, 465, 242]}, 9: {'label': 'pasta', 'box': [35, 216, 136, 248]}, 10: {'label': 'noodles', 'box': [11, 617, 600, 897]}, 11: {'label': 'noodles', 'box': [191, 619, 289, 723]}, 12: {'label': 'beans', 'box': [181, 352, 303, 581]}, 13: {'label': 'elbows', 'box': [157, 21, 327, 290]}, 14: {'label': 'broth', 'box': [285, 624, 348, 851]}, 15: {'label': 'beans', 'box': [0, 308, 600, 891]}, 16: {'label': 'peanutbutter', 'box': [201, 221, 285, 253]}, 17: {'label': 'pasta', 'box': [210, 161, 257, 202]}, 18: {'label': 'elbows', 'box': [0, 114, 165, 288]}, 19: {'label': 'chocolate', 'box': [485, 382, 598, 602]}, 20: {'label': 'noodles', 'box': [343, 622, 408, 849]}, 21: {'label': 'pasta', 'box': [390, 197, 454, 268]}, 22: {'label': 'pasta', 'box': [0, 0, 599, 766]}, 23: {'label': 'beans', 'box': [4, 296, 600, 900]}, 24: {'label': 'pasta', 'box': [257, 223, 285, 252]}, 25: {'label': 'beans', 'box': [184, 357, 303, 579]}, 26: {'label': 'pasta', 'box': [458, 33, 595, 286]}, 27: {'label': 'pasta', 'box': [56, 155, 105, 196]}, 28: {'label': 'elbows', 'box': [0, 14, 327, 295]}, 29: {'label': 'elbows', 'box': [33, 216, 136, 248]}, 30: {'label': 'elbows', 'box': [480, 332, 598, 378]}, 31: {'label': 'sauce', 'box': [363, 247, 390, 270]}, 32: {'label': 'beans', 'box': [184, 357, 302, 579]}, 33: {'label': 'sauce', 'box': [14, 311, 108, 381]}, 34: {'label': 'ramen', 'box': [131, 802, 184, 834]}, 35: {'label': 'elbows', 'box': [0, 29, 163, 289]}, 36: {'label': 'elbows', 'box': [156, 115, 315, 283]}, 37: {'label': 'noodles', 'box': [322, 314, 489, 409]}, 38: {'label': 'pasta', 'box': [461, 31, 598, 222]}, 39: {'label': 'broth', 'box': [45, 617, 192, 814]}}
     
     return detection_data
+
+class BoxData(BaseModel):
+    label: str
+    box: List[int]
+
+@app.post("/add-detection/{filename}")
+async def add_detection(filename: str, request: Request):
+    body = await request.json()
+    new_id = body["id"]
+    data = body["data"]
+    detection_data[new_id] = {
+        "label": data["label"],
+        "box": data["box"]
+    }
+    return {"message": "Detection added", "id": new_id}
+
+@app.delete("/remove-detection/{id}")
+async def remove_detection(id: int):
+    print(detection_data)
+    if id in detection_data:
+        del detection_data[id]
+        return {"message": f"Detection with ID {id} removed"}
+    else:
+        raise HTTPException(status_code=404, detail="Detection not found")
   
 @app.post("/push-emergency-request")
 async def handle_emergency_request(request: EmergencyRequest):
@@ -319,6 +318,7 @@ async def handle_emergency_request(request: EmergencyRequest):
             "timestamp": datetime.now().isoformat()
         }
 
+
 @app.get("/get-emergency-requests")
 async def get_emergency_requests():
     try:
@@ -342,18 +342,105 @@ async def get_emergency_requests():
             detail="Failed to fetch emergency requests"
         )
 
+@app.get("/get-resident-info/{resident_name}") 
+async def get_resident_info(resident_name: str):
+    try:
+        # Query the resident information from Supabase using the name
+        result = supabase.table("residents").select("*").eq("name", resident_name).execute()
+        
+        if not result.data or len(result.data) == 0:
+            return {"success": False, "message": f"Resident with name {resident_name} not found"}
+            
+        # Get the first matching resident
+        resident = result.data[0]        
+        # Now use this resident_id for your recipe generation logic
+        # (replacing your existing recipe generation code with the resident-specific logic)
+      #  recipes = get_dict(resident, "ingredients_from_image", "Dinner")
+        return {
+            "age": resident.get("age"),
+            "medical_conditions": resident.get("medical_conditions"),
+            "medications": resident.get("medications"),
+            "food_allergies": resident.get("food_allergies"),
+            "special_supportive_services": resident.get("special_supportive_services"),
+        }
+    
 
-test_resident = ResidentInfo(
-    name="John Doe",
-    password='Bruh',
-    age=78, 
-    medicalConditions="Diabetes, Hypertension", 
-    medications="Metformin, Lisinopril",
-    foodAllergies="Dairy",
-    specialSupportiveServices="Assistance with daily insulin shots")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "message": f"Error generating recipes: {str(e)}"}
 
-print("This is the recipe below\n", generate_recipe(test_resident, "beans,cheese, ground beef, rice, soy sauce, milk, brocoli", 'Dinner'), sep = '')
+@app.get("/get-residents-info")
+async def get_residents_info():
+    try:
+        # Query all residents from the residents table
+        result = supabase.table("residents").select(
+            "name",
+            "age",
+            "medical_conditions",
+            "medications", 
+            "food_allergies",
+            "special_supportive_services"
+        ).execute()
+        
+        # Return the data from the query
+        residents = result.data
+        return {"success": True, "residents": residents}
+    
+    except Exception as e:
+        # Handle any errors that occur during the query
+        return {"success": False, "error": str(e)}
 
+@app.get("/get_emergency_requests")
+async def get_emergency_requests():
+    try:
+        result = supabase.table("emergency_logs").select("*").order("timestamp", desc=True).execute()
+        
+        print(f"Retrieved {len(result.data) if result.data else 0} emergency requests")
+        
+        if result.data:
+            return {"requests": result.data}
+        else:
+            return {"requests": []}
+            
+    except Exception as e:
+        print(f"Error fetching emergency requests: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return an error response
+        raise HTTPException(
+            status_code=500, 
+            detail="Failed to fetch emergency requests"
+        )
+    
+def get_all_labels(d):
+    labels = [item["label"] for item in d.values()]
+    return ",".join(labels)
+
+@app.get("/get-recipes-by-name/{resident_name}")
+async def get_recipes_by_name(resident_name: str):
+    try:
+        data = await get_resident_info(resident_name) 
+        unique_foods = get_all_labels(detection_data)
+
+        resident_info = ResidentInfo(
+            name=resident_name,
+            password="",
+            age=data.get("age"),
+            medicalConditions=data.get("medical_conditions"),
+            medications=data.get("medications"),
+            foodAllergies=data.get("food_allergies"),
+            specialSupportiveServices=data.get("special_supportive_services"),
+        )
+        d = get_dict(resident_info, unique_foods)
+        return d
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "message": f"Error generating recipes: {str(e)}"}
+    
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
