@@ -41,7 +41,7 @@ export default function Home() {
                 href="#recommendations"
                 className="text-sm font-medium transition-colors hover:text-red-600"
               >
-                Recommendations
+                Reviews
               </Link>
               <Link
                 href="#contact"
@@ -49,7 +49,12 @@ export default function Home() {
               >
                 Contact
               </Link>
-              <Button size="sm">Get Started</Button>
+              <Button size="sm" asChild>
+                  <Link href="/select-role">
+                    Get Started
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Link>
+              </Button>
             </nav>
           </div>
         </div>
@@ -80,7 +85,7 @@ export default function Home() {
                 </div>
               </div>
               <Image
-                src="/homepage.jpg"
+                src="/HomePageCaretaker.jpg"
                 width={550}
                 height={550}
                 alt="Hero Image"
@@ -159,49 +164,47 @@ export default function Home() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Alice</CardTitle>
-                      <CardDescription>Review.....</CardDescription>
+                      <CardDescription>I wanna kiss whoever made this</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <Image
-                        src="/homepage.jpg"
+                        src="/Alice.jpg"
                         width={300}
                         height={200}
                         alt="Card image"
                         className="rounded-lg object-cover w-full h-40 mb-4"
                       />
-                      <p>Review...</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader>
                       <CardTitle>Bob</CardTitle>
-                      <CardDescription>Card description text</CardDescription>
+                      <CardDescription>Very cool</CardDescription>
                     </CardHeader>
                     <CardContent>
                       <Image
-                        src="/homepage.jpg"
+                        src="/Bob.jpg"
                         width={300}
                         height={200}
                         alt="Card image"
                         className="rounded-lg object-cover w-full h-40 mb-4"
                       />
-                      <p>This saved my life gg ez.</p>                      
                     </CardContent>
 
                   </Card>
                   <Card>
                     <CardHeader>
                       <CardTitle>Trudy</CardTitle>
+                      <p>Very cool 👍 Dodged death gg</p>
                     </CardHeader>
                     <CardContent>
                       <Image
-                        src="/homepage.jpg"
+                        src="/Trudy.jpeg"
                         width={300}
                         height={200}
                         alt="Card image"
                         className="rounded-lg object-cover w-full h-40 mb-4"
                       />
-                      <p>Peepo</p>
                     </CardContent>
                   </Card>
                 </div>
@@ -349,26 +352,7 @@ export default function Home() {
                 </li>
               </ul>
             </div>
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium">Footer Column 4</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <Link href="#" className="text-gray-500 hover:text-gray-900">
-                    Link 1
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-500 hover:text-gray-900">
-                    Link 2
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-500 hover:text-gray-900">
-                    Link 3
-                  </Link>
-                </li>
-              </ul>
-            </div>
+            
           </div>
         </div>
       </footer>
