@@ -352,7 +352,7 @@ test_resident = ResidentInfo(
     foodAllergies="Dairy",
     specialSupportiveServices="Assistance with daily insulin shots")
 
-print("This is the recipe below\n", generate_recipe(test_resident, "beans, cheese, ground beef, rice, soy sauce, milk, brocoli", 'Dinner'), sep = '')
+print("This is the recipe below\n", generate_recipe(test_resident, "beans,cheese, ground beef, rice, soy sauce, milk, brocoli", 'Dinner'), sep = '')
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

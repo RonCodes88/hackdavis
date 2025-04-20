@@ -6,6 +6,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.units import inch
 import argparse
+from cerebras.cloud.sdk import Cerebras
 
 # Create pdfs directory if it doesn't exist
 PDF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pdfs")
