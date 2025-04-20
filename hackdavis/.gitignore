@@ -47,3 +47,5 @@ next-env.d.ts
 /backend/skadoosh/
 
 hackdavis/anthropic-API.ipynb
+
+/backend/pdfs/

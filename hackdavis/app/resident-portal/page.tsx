@@ -15,7 +15,6 @@ import {
 
 export default function Portal() {
   const searchParams = useSearchParams();
-  const agentName = searchParams.get("agentName") || "Your Caretaker";
   const residentName = searchParams.get("residentName") || "Unknown Resident";
   const residentId = searchParams.get("residentId") || "Unknown Resident ID";
   const router = useRouter();
@@ -86,20 +85,35 @@ export default function Portal() {
   const handleFileUpload = async () => {
     if (uploadedFiles.length === 0) return;
 
+    // Debug what residentId actually is
+    console.log("ResidentId before parsing:", residentId);
+
+    const parsedId = parseInt(residentId);
+    console.log("Parsed residentId:", parsedId);
+
+    if (isNaN(parsedId)) {
+      console.error("Invalid resident ID - cannot parse to integer");
+      setUploadStatus("error");
+      return;
+    }
+
     setUploadStatus("uploading");
     try {
-      // Create FormData for file upload
+      const file = uploadedFiles[0];
       const formData = new FormData();
-      uploadedFiles.forEach((file) => {
-        formData.append("files", file);
-      });
-      formData.append("residentId", residentId);
+      formData.append("file", file);
+      formData.append("resident_id", String(parsedId));
 
-      // Example API call - replace with your actual endpoint
-      const response = await fetch("http://localhost:8000/upload-documents", {
-        method: "POST",
-        body: formData,
-      });
+      // Log the form data to verify it's being set correctly
+      console.log("Form data resident_id:", formData.get("resident_id"));
+
+      const response = await fetch(
+        "http://localhost:8000/upload-medical-history-pdf",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Upload failed: ${response.status}`);
@@ -108,6 +122,8 @@ export default function Portal() {
       setUploadStatus("success");
       // Optionally clear files after successful upload
       // setUploadedFiles([]);
+      const data = await response.json();
+      console.log("Upload response:", data);
     } catch (error) {
       console.error("File upload failed:", error);
       setUploadStatus("error");
@@ -155,11 +171,6 @@ export default function Portal() {
         <h2 className="mb-2 text-2xl font-bold text-gray-700">
           Welcome, {residentName}
         </h2>
-        <p className="mb-6 text-lg text-gray-600">
-          Your caretaker today is:{" "}
-          <span className="font-semibold text-red-500">{agentName}</span>
-        </p>
-
         {/* Emergency and Care Request Cards */}
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* HELP ME Card */}
