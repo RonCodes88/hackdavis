@@ -23,7 +23,6 @@ from langchain.chains.question_answering import load_qa_chain
 from langchain_cerebras import ChatCerebras
 from langchain_pinecone import PineconeVectorStore
 import asyncio
-from twilio.rest import Client
 
 from recipe_generator import get_dict, text_to_dict
 
