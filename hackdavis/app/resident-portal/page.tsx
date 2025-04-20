@@ -350,7 +350,6 @@ export default function Portal() {
       setShowProfileModal(false);
     } catch (error) {
       console.error("Error saving profile data:", error);
-      alert("There was a problem saving your profile. Please try again.");
     }
   };
 
