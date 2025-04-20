@@ -395,13 +395,15 @@ async def notify_all_clients(resident_id, resident_name):
 def get_current_emergency_summaries():
     """
     Get current emergency summaries for WebSocket updates with RAG
+    Returns only the most recent emergency with a concise summary
     """
     try:
-        # Fetch all emergency logs with PENDING status
+        # Fetch most recent emergency log with PENDING status
         emergency_result = (supabase.table("emergency_logs")
                           .select("*")
                           .eq("status", "PENDING")
                           .order("timestamp", desc=True)
+                          .limit(1)  # Only get the most recent one
                           .execute())
         
         if not emergency_result.data or len(emergency_result.data) == 0:
@@ -418,14 +420,21 @@ def get_current_emergency_summaries():
             pc = PineconeClient(api_key=PINECONE_API_KEY)
             index_name = "hackdavis-rag-index"
             
-            # Use the new PineconeVectorStore class with the proper initialization
+            # Get the one emergency we're processing
+            emergency_data = emergency_result.data[0]
+            resident_id = emergency_data.get("resident_id")
+            
+            # Use the new PineconeVectorStore class with the resident filter
             docsearch = PineconeVectorStore(
                 index_name=index_name,
                 embedding=embeddings,
                 text_key="text",
                 pinecone_api_key=PINECONE_API_KEY
             )
-            print("Successfully initialized Pinecone vector store for WebSocket notifications")
+            
+            # Create a filter for the similarity search later
+            filter_dict = {"resident_id": resident_id} if resident_id else None
+            print(f"Successfully initialized Pinecone vector store for resident {resident_id}")
             
             # Initialize LLM for RAG
             llm = ChatCerebras(api_key=CEREBRAS_API_KEY, model="llama-3.3-70b")
@@ -436,73 +445,73 @@ def get_current_emergency_summaries():
             docsearch = None
             chain = None
             
-        # Process each emergency
+        # Process the emergency
         emergency_summaries = []
-        for emergency_data in emergency_result.data:
-            resident_id = emergency_data.get("resident_id")
-            resident_name = emergency_data.get("resident_name")
-            
-            # Get resident details
-            try:
-                resident_details = supabase.table("residents").select("*").eq("id", resident_id).execute()
-                if resident_details.data and len(resident_details.data) > 0:
-                    resident_record = resident_details.data[0]
-                else:
-                    resident_record = {}
-            except Exception as e:
-                print(f"Error fetching resident details: {e}")
-                resident_record = {}
-                
-            # Compile resident info
-            resident_info = {
-                "name": resident_name,
-                "age": resident_record.get("age", "Unknown"),
-                "medical_conditions": resident_record.get("medical_conditions", "Not specified"),
-                "medications": resident_record.get("medications", "Not specified"),
-                "food_allergies": resident_record.get("food_allergies", "Not specified"),
-                "special_supportive_services": resident_record.get("special_supportive_services", "Not specified")
-            }
-            
-            # If RAG components are available, use them
-            if docsearch and chain:
-                prompt = f"""
-                An urgent medical emergency is occurring for a patient. Their relevant medical information is provided below. Summarize the following key medical information as quickly and accurately as possible using Retrieval-Augmented Generation (RAG) from the available knowledge. The summary should focus on the following points:
-                Known Issues and Chronic Diseases: List the most current critical health symptoms observed and their duration, if known. Pay special attention to chronic diseases, and clearly list them. Include any unusual patterns or red flags with the patient that might require special attention.
-                Phone Numbers: Identify and list the phone numbers of professional emergency contacts, such as the family doctor, local emergency services, emergency road service providers, regional poison control center, and other relevant emergency contacts for the patient. Clearly label each number with the corresponding contact's name and role (e.g., doctor, emergency service, etc.).
-                Medical History and Current Medications: Highlight the patient's blood type, relevant past medical conditions, recent surgeries, operations, allergies, or any significant medical history pertinent to the current situation. Include a list of ongoing medications, dosages, and note any recent changes or adjustments.
-                Emergency Priorities: Outline immediate steps or interventions to consider, without suggesting specific treatments—just relevant information to guide the physician's decision-making. Focus on essential data to help the doctor prioritize actions swiftly and accurately.
-                
-                Patient information:
-                Name: {resident_info['name']}
-                Age: {resident_info['age']}
-                Medical conditions: {resident_info['medical_conditions']}
-                Medications: {resident_info['medications']}
-                Food allergies: {resident_info['food_allergies']}
-                Special supportive services: {resident_info['special_supportive_services']}
-                """
-                
-                try:
-                    # Perform vector search
-                    docs = docsearch.similarity_search(prompt, k=3)
-                    print(f"Found {len(docs)} relevant documents via similarity search for WebSocket")
-                    
-                    # Generate RAG response
-                    response = chain.run(input_documents=docs, question=prompt)
-                    summary = response
-                except Exception as search_error:
-                    print(f"Vector search error in WebSocket: {search_error}")
-                    summary = f"EMERGENCY: {emergency_data.get('emergency_type', 'Unknown')} - Medical staff has been notified. Full medical details available."
+        emergency_data = emergency_result.data[0]
+        resident_id = emergency_data.get("resident_id")
+        resident_name = emergency_data.get("resident_name")
+        
+        # Get resident details
+        try:
+            resident_details = supabase.table("residents").select("*").eq("id", resident_id).execute()
+            if resident_details.data and len(resident_details.data) > 0:
+                resident_record = resident_details.data[0]
             else:
-                # Use default summary if RAG is not available
-                summary = f"EMERGENCY: {emergency_data.get('emergency_type', 'Unknown')} - Medical staff has been notified. Full medical details available."
+                resident_record = {}
+        except Exception as e:
+            print(f"Error fetching resident details: {e}")
+            resident_record = {}
             
-            # Create the emergency summary entry
-            emergency_summaries.append({
-                "resident_info": resident_info,
-                "summary": summary,
-                "emergency_type": emergency_data.get("emergency_type", "Unknown")
-            })
+        # Compile resident info - keep only essential information
+        resident_info = {
+            "name": resident_name,
+            "age": resident_record.get("age", "Unknown"),
+            "medical_conditions": resident_record.get("medical_conditions", "Not specified"),
+            "medications": resident_record.get("medications", "Not specified")
+        }
+        
+        # If RAG components are available, use them
+        if docsearch and chain:
+            # Create a more concise prompt
+            prompt = f"""
+            You are in charge of monitoring residents in a senior home, so give advice. An urgent medical emergency is occurring for a patient. Their relevant medical information is provided below. Summarize the following key medical information as quickly and accurately as possible using Retrieval-Augmented Generation (RAG) from the available knowledge. The summary should focus on the following points:
+Medical Consent and Directives: Pay attention to any medical consent forms or advance directives related to the patient, including "do not resuscitate" (DNR) orders, organ donation preferences, or any other legally binding instructions. Ensure these are clearly identified and noted, so that medical professionals are informed of the patient's wishes.
+Emergency Priorities: Outline immediate steps or interventions to consider, without suggesting specific treatments—just relevant information to guide the physician’s decision-making. Focus on essential data to help the doctor prioritize actions swiftly and accurately.
+Just give the bullet points, ensure the summary is clear, concise, and focused on providing the doctor with pertinent details to facilitate quick judgment and decision-making.
             
+            Patient information:
+            Name: {resident_info['name']}
+            Age: {resident_info['age']}
+            Medical conditions: {resident_info['medical_conditions']}
+            Medications: {resident_info['medications']}
+            """
+            
+            try:
+                # Perform vector search with more targeted k value and apply filter
+                docs = docsearch.similarity_search(
+                    prompt, 
+                    k=2,
+                    filter=filter_dict  # Apply the filter here instead
+                )
+                print(f"Found {len(docs)} relevant documents via similarity search")
+                
+                # Generate RAG response with instruction to be concise
+                response = chain.run(input_documents=docs, question=prompt)
+                summary = response
+            except Exception as search_error:
+                print(f"Vector search error: {search_error}")
+                summary = f"ALERT: {emergency_data.get('emergency_type', 'Unknown')} for {resident_name}"
+        else:
+            # Use very concise default summary
+            summary = f"ALERT: {emergency_data.get('emergency_type', 'Unknown')} for {resident_name}"
+        
+        # Create single emergency summary entry
+        emergency_summaries.append({
+            "resident_info": resident_info,
+            "summary": summary,
+            "emergency_type": emergency_data.get("emergency_type", "Unknown")
+        })
+        
         return emergency_summaries
         
     except Exception as e:
@@ -588,11 +597,19 @@ async def upload_medical_history_pdf(
         try:
             # Process with RAG
             docs = load_and_split_pdf(temp_pdf_path)
+            
+            # Add resident_id to the metadata of each document
+            if resident_id_int:
+                for doc in docs:
+                    if not hasattr(doc, 'metadata'):
+                        doc.metadata = {}
+                    doc.metadata['resident_id'] = resident_id_int
+            
             embeddings = OllamaEmbeddings(model="nomic-embed-text")
             index_name = "hackdavis-rag-index"
             init_pinecone_index(index_name)
             vector_store = upload_vectors(docs, embeddings, index_name)
-            print(f"PDF successfully processed and indexed for RAG")
+            print(f"PDF successfully processed and indexed for RAG with resident_id {resident_id_int} in metadata")
         except Exception as rag_err:
             print(f"Warning: RAG processing failed: {rag_err}")
             # Continue with the function even if RAG fails
@@ -739,6 +756,61 @@ async def get_recipes_by_name(resident_name: str):
         traceback.print_exc()
         return {"success": False, "message": f"Error generating recipes: {str(e)}"}
     
+
+@app.post("/update-emergency-status/{emergency_id}")
+async def update_emergency_status(emergency_id: str, background_tasks: BackgroundTasks):
+    try:
+        # Update the emergency status in the database
+        result = supabase.table("emergency_logs").update({
+            "status": "RESOLVED",
+            "resolved_at": datetime.now().isoformat()
+        }).eq("id", emergency_id).execute()
+        
+        if not result.data or len(result.data) == 0:
+            raise HTTPException(status_code=404, detail="Emergency request not found")
+        
+        # Get the updated emergency for the websocket notification
+        emergency_data = result.data[0]
+        
+        # Notify all connected clients about the status change
+        background_tasks.add_task(notify_status_update, emergency_data)
+        
+        return {
+            "success": True,
+            "message": "Emergency status updated to RESOLVED",
+            "emergency_id": emergency_id
+        }
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Error updating emergency status: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to update emergency status: {str(e)}")
+
+async def notify_status_update(emergency_data):
+    """Notify all connected WebSocket clients about a status update"""
+    for connection in active_connections:
+        try:
+            await connection.send_json({
+                "type": "status_update",
+                "data": {
+                    "emergency_id": emergency_data["id"],
+                    "status": "RESOLVED",
+                    "updated_at": datetime.now().isoformat()
+                }
+            })
+            
+            # Also send updated emergency summaries
+            emergency_summaries = get_current_emergency_summaries()
+            await connection.send_json({
+                "type": "emergency_update",
+                "data": emergency_summaries
+            })
+        except Exception as e:
+            print(f"Error notifying client of status update: {e}")
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 

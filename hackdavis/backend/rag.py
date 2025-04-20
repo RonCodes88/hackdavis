@@ -46,25 +46,22 @@ def init_pinecone_index(index_name):
     return PineconeVectorStore(index_name=index_name, embedding=OllamaEmbeddings(model="nomic-embed-text"))
 
 
-def get_docsearch_for_resident(index_name):
+def get_docsearch_for_resident(resident_id):
     """
-    Get the document search interface for a specific resident
+    Get vector search specifically filtered for a resident
     """
-    import pinecone
-    from langchain_pinecone import PineconeVectorStore
-    from langchain_ollama import OllamaEmbeddings
-    
-    # Initialize Pinecone client
-    pinecone.init()
-    
-    # Get embeddings model
     embeddings = OllamaEmbeddings(model="nomic-embed-text")
     
-    # Create vector store from the index
+    # Use filter to only return vectors with matching resident_id
     docsearch = PineconeVectorStore(
-        index_name=index_name,
-        embedding=embeddings
+        index_name="hackdavis-rag-index",
+        embedding=embeddings,
+        text_key="text",
+        pinecone_api_key=PINECONE_API_KEY,
+        filter={"resident_id": resident_id}
     )
+
+    init_pinecone_index(index_name)
     
     return docsearch
     

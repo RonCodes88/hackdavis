@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react"; // Add useRef
 import { useRouter } from "next/navigation";
 import { ImageUpload } from "@/components/ui/image-processor";
 import ExampleUsagePage from "@/components/ui/image-page";
@@ -27,8 +27,21 @@ interface EmergencySummaryEntry {
   summary: string;
 }
 
+interface EmergencyData {
+  resident_data: {
+    name: string;
+    age: string;
+    medical_conditions: string;
+    medications: string;
+    food_allergies: string;
+    special_supportive_services: string;
+  };
+  ai_response: string;
+}
+
 export default function CaretakerPortal() {
   const router = useRouter();
+  const wsRef = useRef<WebSocket | null>(null); // Add a WebSocket reference
   const [activeTab, setActiveTab] = useState("home");
   const [emergencyRequests, setEmergencyRequests] = useState<
     EmergencyRequest[]
@@ -41,27 +54,56 @@ export default function CaretakerPortal() {
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
 
-  // Remove polling on mount
+  // On component mount, set up WebSocket connection and perform initial fetch
   useEffect(() => {
-    // Initial fetch only - after this, WebSockets take over
+    // Initial fetch only once
     fetchEmergencySummary();
-  }, []);
 
-  // Also remove any interval-based polling if present
-  // Delete this if it exists:
-  useEffect(() => {
-    const summaryIntervalId = setInterval(fetchEmergencySummary, 3000);
-    return () => clearInterval(summaryIntervalId);
-  }, [activeTab]);
+    // Set up WebSocket connection
+    const ws = new WebSocket("ws://localhost:8000/ws/emergency-updates");
+    wsRef.current = ws;
 
-  // Fetch emergency requests on component mount
+    // Listen for WebSocket messages
+    ws.onopen = () => {
+      console.log("WebSocket connection established");
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log("WebSocket message received:", data);
+
+      if (data.type === "emergency_update") {
+        // Update state with the new emergency summary
+        setEmergencySummary(data.data);
+      } else if (data.type === "new_emergency") {
+        // Handle notification of new emergency
+        console.log("New emergency notification:", data.data);
+        // You could play a sound, show a notification, etc.
+        // Then fetch the full details
+        fetchEmergencySummary();
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket connection closed");
+    };
+
+    // Clean up WebSocket on component unmount
+    return () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.close();
+      }
+    };
+  }, []); // Empty dependency array means this runs once on mount
+
+  // Only keep the emergency requests polling if needed, or convert that to WebSocket too
   useEffect(() => {
     fetchEmergencyRequests();
-
-    // Set up polling every 30 seconds to check for new emergencies
-    const intervalId = setInterval(fetchEmergencyRequests, 30000);
-
-    // Clean up the interval when component unmounts
+    const intervalId = setInterval(fetchEmergencyRequests, 30000); // 30 seconds is reasonable
     return () => clearInterval(intervalId);
   }, []);
 
@@ -105,10 +147,12 @@ export default function CaretakerPortal() {
         setEmergencySummary(data.emergency_summaries);
       } else if (data.emergencies && Array.isArray(data.emergencies)) {
         // New format - convert to expected format for the UI
-        const formattedSummaries = data.emergencies.map((emergency) => ({
-          resident_info: emergency.resident_data,
-          summary: emergency.ai_response,
-        }));
+        const formattedSummaries = data.emergencies.map(
+          (emergency: EmergencyData) => ({
+            resident_info: emergency.resident_data,
+            summary: emergency.ai_response,
+          })
+        );
         setEmergencySummary(formattedSummaries);
       } else {
         setEmergencySummary(null);
@@ -119,16 +163,23 @@ export default function CaretakerPortal() {
       }
 
       setSummaryLoading(false);
-    } catch (err) {
-      console.error("Failed to fetch emergency summary:", err);
+    } catch (error: unknown) {
+      console.error("Failed to fetch emergency summary:", error);
+
+      // Type guard to safely access error properties
+      const err = error as { name?: string; message?: string };
+
       if (err.name === "AbortError") {
         setSummaryError("Request timed out. Backend server might be down.");
       } else {
-        setSummaryError(`Failed to load emergency summary: ${err.message}`);
+        setSummaryError(
+          `Failed to load emergency summary: ${err.message || "Unknown error"}`
+        );
       }
       setSummaryLoading(false);
     }
-      
+  };
+
   const onGenerateRecipes = async () => {
     const res = await fetch("http://localhost:8000/get-recipes");
     const data = await res.json();
