@@ -1,5 +1,4 @@
 from pydantic import BaseModel
-from caretaker_manager import create_caretaker_agent
 from typing import Optional
 import os
 from supabase import create_client, Client

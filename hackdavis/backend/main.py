@@ -12,7 +12,7 @@ import shutil
 from helper import load_env
 from model.generate import run_all
 from datetime import datetime
-# from caretaker_manager import create_caretaker_agent
+from recipe_generator import generate_recipe 
 from pathlib import Path
 from cerebras_agent import create_caretaker_profile, get_agent_response
 
