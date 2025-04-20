@@ -103,10 +103,10 @@ def login(request: LoginRequest):
             resident_info = {
                 "name": resident.get("name"),
                 "age": resident.get("age"),
-                "medical_conditions": resident.get("medical_conditions"),
+                "medical_conditions": resident.get("medicalConditions"),
                 "medications": resident.get("medications"),
-                "food_allergies": resident.get("food_allergies"),
-                "special_supportive_services": resident.get("special_supportive_services")
+                "food_allergies": resident.get("foodAllergies"),
+                "special_supportive_services": resident.get("specialSupportiveServices")
             }
 
             return {
@@ -527,6 +527,8 @@ def get_current_emergency_summaries():
             "age": resident_record.get("age", "Unknown"),
             "medical_conditions": resident_record.get("medical_conditions", "Not specified"),
             "medications": resident_record.get("medications", "Not specified"),
+            "food_allergies": resident_record.get("food_allergies", "Not specified"),
+            "special_supportive_services": resident_record.get("special_supportive_services", "Not specified"),
             "id": resident_record.get("id", "Not specified")
         }
 
@@ -582,6 +584,7 @@ Just give the bullet points, ensure the summary is clear, concise, and focused o
             # Use very concise default summary
             summary = f"ALERT: {emergency_data.get('emergency_type', 'Unknown')} for {resident_name}"
         
+        print("Resident info:", resident_info)
         # Create single emergency summary entry
         emergency_summaries.append({
             "resident_info": resident_info,
@@ -862,17 +865,32 @@ async def get_recipes_by_name(resident_name: str):
         return {"success": False, "message": f"Error generating recipes: {str(e)}"}
     
 
-@app.post("/update-emergency-status/{emergency_id}")
-async def update_emergency_status(emergency_id: str, background_tasks: BackgroundTasks):
+@app.post("/update-emergency-status/{emergency_name}")
+async def update_emergency_status(emergency_name: str, background_tasks: BackgroundTasks):
     try:
-        # Update the emergency status in the database
+        print(f"Attempting to resolve emergency for resident: {emergency_name}")
+        
+        # First, check if any matching records exist
+        check_result = supabase.table("emergency_logs").select("*").eq("resident_name", emergency_name).execute()
+        
+        if not check_result.data or len(check_result.data) == 0:
+            print(f"No emergency records found for resident: {emergency_name}")
+            raise HTTPException(status_code=404, detail=f"No emergency records found for resident: {emergency_name}")
+        
+        # Log the found records
+        print(f"Found {len(check_result.data)} records for resident {emergency_name}")
+        for record in check_result.data:
+            print(f"Record ID: {record.get('id')}, Status: {record.get('status')}")
+        
+        # Update only the PENDING ones
         result = supabase.table("emergency_logs").update({
             "status": "RESOLVED",
             "resolved_at": datetime.now().isoformat()
-        }).eq("resident_name", emergency_id).execute()
+        }).eq("resident_name", emergency_name).eq("status", "PENDING").execute()
         
         if not result.data or len(result.data) == 0:
-            raise HTTPException(status_code=404, detail="Emergency request not found")
+            print(f"No PENDING emergency records found for resident: {emergency_name}")
+            raise HTTPException(status_code=404, detail=f"Emergency request not found with PENDING status for {emergency_name}")
         
         # Get the updated emergency for the websocket notification
         emergency_data = result.data[0]
@@ -883,7 +901,8 @@ async def update_emergency_status(emergency_id: str, background_tasks: Backgroun
         return {
             "success": True,
             "message": "Emergency status updated to RESOLVED",
-            "emergency_id": emergency_id
+            "emergency_id": emergency_name,
+            "updated_records": len(result.data)
         }
     except HTTPException as he:
         raise he

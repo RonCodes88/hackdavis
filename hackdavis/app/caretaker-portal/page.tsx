@@ -5,7 +5,6 @@ import { ImageUpload } from "@/components/ui/image-processor";
 import ExampleUsagePage from "@/components/ui/image-page";
 import { FaExclamationTriangle } from "react-icons/fa";
 import ResidentAlert from "@/components/ui/resident-alert";
-import { get } from "http";
 
 // Define the emergency request type
 interface EmergencyRequest {
@@ -109,22 +108,53 @@ export default function CaretakerPortal() {
     return () => clearInterval(intervalId);
   }, []);
 
-  const updateEmergencyStatus = async (emergencyId: string) => {
+  const updateEmergencyStatus = async (residentName: string, index: number) => {
     try {
+      console.log(`Attempting to resolve emergency for: ${residentName}`);
+
+      // Call the FastAPI endpoint with the resident name as emergency_id
       const response = await fetch(
-        `http://localhost:8000//update-emergency-status/${emergencyId}`
+        `http://localhost:8000/update-emergency-status/${encodeURIComponent(
+          residentName
+        )}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
       );
 
-      const result = await response.json();
+      const responseData = await response.json();
+      console.log("Response from server:", responseData);
 
-      if (response.ok) {
-        console.log("Success:", result.message);
-        // Optionally update UI or show a toast/alert
-      } else {
-        console.error("Error:", result.detail || "Unknown error");
+      if (!response.ok) {
+        throw new Error(
+          responseData.detail || "Failed to update emergency status"
+        );
       }
+
+      // Update UI to reflect the resolved status
+      const updatedElement = document.querySelector(
+        `[data-emergency-index="${index}"] .status-badge`
+      );
+      if (updatedElement) {
+        updatedElement.textContent = "RESOLVED";
+        updatedElement.classList.remove("bg-red-100", "text-red-700");
+        updatedElement.classList.add("bg-green-100", "text-green-700");
+      }
+
+      // Refresh emergency data after a short delay
+      setTimeout(() => {
+        fetchEmergencySummary();
+      }, 500);
     } catch (error) {
-      console.error("Request failed:", error);
+      console.error("Error updating emergency status:", error);
+      alert(
+        `Error: ${
+          error instanceof Error ? error.message : "Failed to update emergency"
+        }`
+      );
     }
   };
 
@@ -258,23 +288,13 @@ export default function CaretakerPortal() {
 
           <button
             className={`px-4 py-2 rounded-lg ${
-              activeTab === "kitchen"
-                ? "bg-red-500 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-            onClick={() => setActiveTab("kitchen")}
-          >
-            Manage Kitchen
-          </button>
-          <button
-            className={`px-4 py-2 rounded-lg ${
               activeTab === "upload"
                 ? "bg-red-500 text-white"
                 : "bg-gray-200 text-gray-700 hover:bg-gray-300"
             }`}
             onClick={() => setActiveTab("upload")}
           >
-            Upload
+            Upload Pantry Image
           </button>
           <button
             className="rounded-lg bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
@@ -301,13 +321,14 @@ export default function CaretakerPortal() {
               emergencySummary.map((entry, index) => (
                 <div
                   key={index}
+                  data-emergency-index={index}
                   className="mb-8 bg-red-50 border border-red-300 rounded-lg shadow-md p-6"
                 >
                   <div className="flex justify-between mb-4">
                     <h3 className="text-xl font-bold">
                       Resident: {entry.resident_info.name}
                     </h3>
-                    <span className="bg-red-100 text-red-700 px-3 py-1 h-fit rounded-full text-sm font-medium">
+                    <span className="status-badge bg-red-100 text-red-700 px-3 py-1 h-fit rounded-full text-sm font-medium">
                       PENDING
                     </span>
                   </div>
@@ -317,7 +338,7 @@ export default function CaretakerPortal() {
                       <h4 className="font-semibold text-red-700 mb-2">
                         Resident Information
                       </h4>
-                      <div className="bg-white p-4 rounded-md">
+                      <div className="bg-white p-4 rounded-md h-full">
                         <p>
                           <strong>Age:</strong> {entry.resident_info.age}
                         </p>
@@ -344,17 +365,17 @@ export default function CaretakerPortal() {
                       <h4 className="font-semibold text-red-700 mb-2">
                         AI Medical Assessment
                       </h4>
-                      <div className="bg-white p-4 rounded-md">
+                      <div className="bg-white p-4 rounded-md h-full">
                         <ResidentAlert data={JSON.parse(entry.summary)} />
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-6 flex justify-end">
+                  <div className="mt-12 flex justify-end">
                     <button
                       className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
                       onClick={() =>
-                        updateEmergencyStatus(entry.resident_info.name)
+                        updateEmergencyStatus(entry.resident_info.name, index)
                       }
                     >
                       Mark as Resolved
@@ -504,81 +525,20 @@ export default function CaretakerPortal() {
           </div>
         )}
 
-        {activeTab === "agents" && (
-          <div className="container mx-auto">
-            <h2 className="mb-4 text-3xl font-bold text-gray-700">
-              Agent Management
-            </h2>
-            <p className="mb-6 text-lg text-gray-600">
-              View and manage all care agents in the facility.
-            </p>
-            {/* Agent list would go here */}
-            <div className="bg-white rounded-lg shadow-md p-4">
-              <table className="min-w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2 text-red-500">Name</th>
-                    <th className="text-left p-2 text-red-500">Status</th>
-                    <th className="text-left p-2 text-red-500">Location</th>
-                    <th className="text-left p-2 text-red-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-b">
-                    <td className="p-2">Agent 001</td>
-                    <td className="p-2">
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                        Active
-                      </span>
-                    </td>
-                    <td className="p-2">Floor 1</td>
-                    <td className="p-2">
-                      <button className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">
-                        Contact
-                      </button>
-                    </td>
-                  </tr>
-                  <tr className="border-b">
-                    <td className="p-2">Agent 002</td>
-                    <td className="p-2">
-                      <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                        Break
-                      </span>
-                    </td>
-                    <td className="p-2">Kitchen</td>
-                    <td className="p-2">
-                      <button className="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">
-                        Contact
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
         {activeTab === "upload" && (
           <main className="container mx-auto py-10 px-4 md:px-6">
             <div className="max-w-2xl mx-auto space-y-6">
               <div className="space-y-2">
                 <h1 className="text-3xl font-bold tracking-tight">
-                  Image Upload
+                  Pantry Image Upload
                 </h1>
                 <p className="text-gray-500 dark:text-gray-400">
-                  Upload your images by dragging and dropping or selecting a
+                  Upload your pantry images by dragging and dropping or selecting a
                   file.
                 </p>
               </div>
 
               <ImageUpload onImageUpload={() => setActiveTab("interact")} />
-
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                <p>
-                  In a real application, you would upload this file to a server
-                  or storage service like Vercel Blob [^1][^3].
-                </p>
-              </div>
             </div>
           </main>
         )}
