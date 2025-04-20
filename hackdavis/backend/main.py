@@ -10,8 +10,10 @@ from supabase import create_client, Client
 import shutil
 from helper import load_env
 from model.generate import run_all
-from datetime import datetime
+from datetime import datetime, timezone
+
 from pathlib import Path
+import math
 import uuid
 from pdf_generator_cli import create_medical_history_pdf
 from rag import load_and_split_pdf, init_pinecone_index, upload_vectors, get_docsearch_for_resident
@@ -23,7 +25,7 @@ from langchain_pinecone import PineconeVectorStore
 import asyncio
 from twilio.rest import Client
 
-from recipe_generator import get_dict
+from recipe_generator import get_dict, text_to_dict
 
 
 # Define base directory and paths
@@ -501,7 +503,13 @@ def get_current_emergency_summaries():
         emergency_data = emergency_result.data[0]
         resident_id = emergency_data.get("resident_id")
         resident_name = emergency_data.get("resident_name")
-        
+        time = emergency_data.get("timestamp")
+        description = emergency_data.get("emergency_description")
+        now = datetime.now(timezone.utc)
+        time_dt = datetime.fromisoformat(time)  # still returns aware because of `Z` in string
+        diff = now - time_dt
+        diff_ms = diff.total_seconds() * 1000
+        diff_mins = math.floor(diff_ms / 60000)
         # Get resident details
         try:
             resident_details = supabase.table("residents").select("*").eq("id", resident_id).execute()
@@ -518,24 +526,42 @@ def get_current_emergency_summaries():
             "name": resident_name,
             "age": resident_record.get("age", "Unknown"),
             "medical_conditions": resident_record.get("medical_conditions", "Not specified"),
-            "medications": resident_record.get("medications", "Not specified")
+            "medications": resident_record.get("medications", "Not specified"),
+            "id": resident_record.get("id", "Not specified")
         }
-        
+
+      #  em_type = emergency_data["type"] 
+    
         # If RAG components are available, use them
         if docsearch and chain:
+            
             # Create a more concise prompt
-            prompt = f"""
+            prompt = '''
             You are in charge of monitoring residents in a senior home, so give advice. An urgent medical emergency is occurring for a patient. Their relevant medical information is provided below. Summarize the following key medical information as quickly and accurately as possible using Retrieval-Augmented Generation (RAG) from the available knowledge. The summary should focus on the following points:
 Medical Consent and Directives: Pay attention to any medical consent forms or advance directives related to the patient, including "do not resuscitate" (DNR) orders, organ donation preferences, or any other legally binding instructions. Ensure these are clearly identified and noted, so that medical professionals are informed of the patient's wishes.
 Emergency Priorities: Outline immediate steps or interventions to consider, without suggesting specific treatments—just relevant information to guide the physician’s decision-making. Focus on essential data to help the doctor prioritize actions swiftly and accurately.
-Just give the bullet points, ensure the summary is clear, concise, and focused on providing the doctor with pertinent details to facilitate quick judgment and decision-making.
+Just give the bullet points, ensure the summary is clear, concise, and focused on providing the doctor with pertinent details to facilitate quick judgment and decision-making. If reiterating information about medication or medical history, explain how those could impact the provider's steps.
             
-            Patient information:
+            Format in this way:
+            
+            {"time_since_request": "15 minutes ago",
+            "location": "Room 19",
+            "description": "Resident Jerold is feeling like ",
+            "steps_to_consider": [
+                "Medical history may suggest",
+                "Medication may suggest",
+                "Check for any available medical consent forms or advance directives, including DNR orders",
+                "Assess vital signs and potential causes of fainting, such as low blood sugar or blood pressure issues"
+            ]}''' + f''' You are given the following information:
+
             Name: {resident_info['name']}
             Age: {resident_info['age']}
             Medical conditions: {resident_info['medical_conditions']}
             Medications: {resident_info['medications']}
-            """
+            Room: {resident_info['id']}
+            Request sent at: {diff_mins}
+            Description: {description}
+            '''
             
             try:
                 # Perform vector search with more targeted k value and apply filter
@@ -562,6 +588,8 @@ Just give the bullet points, ensure the summary is clear, concise, and focused o
             "summary": summary,
             "emergency_type": emergency_data.get("emergency_type", "Unknown")
         })
+
+        
         
         return emergency_summaries
         
@@ -841,7 +869,7 @@ async def update_emergency_status(emergency_id: str, background_tasks: Backgroun
         result = supabase.table("emergency_logs").update({
             "status": "RESOLVED",
             "resolved_at": datetime.now().isoformat()
-        }).eq("id", emergency_id).execute()
+        }).eq("resident_name", emergency_id).execute()
         
         if not result.data or len(result.data) == 0:
             raise HTTPException(status_code=404, detail="Emergency request not found")

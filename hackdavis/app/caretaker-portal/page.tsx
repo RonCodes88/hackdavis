@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { ImageUpload } from "@/components/ui/image-processor";
 import ExampleUsagePage from "@/components/ui/image-page";
 import { FaExclamationTriangle } from "react-icons/fa";
+import ResidentAlert from "@/components/ui/resident-alert";
+import { get } from "http";
 
 // Define the emergency request type
 interface EmergencyRequest {
@@ -106,6 +108,25 @@ export default function CaretakerPortal() {
     const intervalId = setInterval(fetchEmergencyRequests, 30000); // 30 seconds is reasonable
     return () => clearInterval(intervalId);
   }, []);
+
+  const updateEmergencyStatus = async (emergencyId: string) => {
+    try {
+      const response = await fetch(
+        `http://localhost:8000//update-emergency-status/${emergencyId}`
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        console.log("Success:", result.message);
+        // Optionally update UI or show a toast/alert
+      } else {
+        console.error("Error:", result.detail || "Unknown error");
+      }
+    } catch (error) {
+      console.error("Request failed:", error);
+    }
+  };
 
   // Function to fetch emergency summary from backend
   const fetchEmergencySummary = async () => {
@@ -234,16 +255,7 @@ export default function CaretakerPortal() {
           >
             Dashboard
           </button>
-          <button
-            className={`px-4 py-2 rounded-lg ${
-              activeTab === "agents"
-                ? "bg-red-500 text-white"
-                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-            }`}
-            onClick={() => setActiveTab("agents")}
-          >
-            View Agents
-          </button>
+
           <button
             className={`px-4 py-2 rounded-lg ${
               activeTab === "kitchen"
@@ -332,14 +344,19 @@ export default function CaretakerPortal() {
                       <h4 className="font-semibold text-red-700 mb-2">
                         AI Medical Assessment
                       </h4>
-                      <div className="bg-white p-4 rounded-md h-[calc(100%-32px)] overflow-y-auto">
-                        <p className="whitespace-pre-line">{entry.summary}</p>
+                      <div className="bg-white p-4 rounded-md">
+                        <ResidentAlert data={JSON.parse(entry.summary)} />
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-6 flex justify-end">
-                    <button className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
+                    <button
+                      className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
+                      onClick={() =>
+                        updateEmergencyStatus(entry.resident_info.name)
+                      }
+                    >
                       Mark as Resolved
                     </button>
                   </div>
