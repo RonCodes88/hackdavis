@@ -32,6 +32,10 @@ def ingredients_str_parser(ingredients_str: str):
     lines = [f"{ingredient}: {count}" for ingredient, count in counted_ingredients.items()]
     return "\n".join(lines)
 
+print(ingredients_str_parser("Ichiban ramen noodles, dark chocolate peanut butter bar, whole grain pasta elbows, peanut butter, pasta sauce, white beans, Whole grain pasta elbows, chicken broth, ichiban ramen noodles"))
+
+
+
 # def generate_recipe(resident_info: ResidentInfo, ingredients_str: str, meal_type: str = None, substitution_allowed: bool = False):
 #     r_info_text = (
 #     f"Name: {resident_info.name}, "
@@ -89,6 +93,10 @@ def ingredients_str_parser(ingredients_str: str):
 
 #Replace above with below when we get the cerebras API
 def generate_recipe(resident_info: ResidentInfo, ingredients_str: str, meal_type: str = None, substitution_allowed: bool = False):
+
+    if (meal_type is None):
+        meal_type = "N/A"
+
     r_info_text = (
     f"Name: {resident_info.name}, "
     f"Age: {resident_info.age}, "
@@ -174,21 +182,18 @@ def generate_recipe(resident_info: ResidentInfo, ingredients_str: str, meal_type
     )
     return chat_completion.choices[0].message.content
    
+def extract_json_from_text(text: str) -> str:
+    start = text.find('{')
+    end = text.rfind('}') + 1
 
-test_resident = ResidentInfo(
-    name="John Doe",
-    password='Bruh',
-    age=78, 
-    medicalConditions="Diabetes, Hypertension", 
-    medications="Metformin, Lisinopril",
-    foodAllergies="Dairy",
-    specialSupportiveServices="Assistance with daily insulin shots")
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError("No valid JSON object found")
+
+    return text[start:end]
 
 def get_dict(resident_info: ResidentInfo, ingredients_str: str, meal_type: str = None, substitution_allowed: bool = False):
-    recipe = generate_recipe(test_resident, "rice, carrot, tomato, egg, beef", 'Dinner')
-    cleaned_string = recipe.strip().removeprefix("```json")
-    cleaned_string = cleaned_string.strip().removesuffix("```")
+    recipe = generate_recipe(resident_info, ingredients_str)
+    cleaned_string = extract_json_from_text(recipe)
     recipe_dict = json.loads(cleaned_string)
     return recipe_dict
 
-d = get_dict(test_resident, "rice, carrot, tomato, egg, beef", 'Dinner')

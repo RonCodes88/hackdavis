@@ -379,6 +379,7 @@ export function InteractiveImageViewer({
               src={imageSrc || "/placeholder.svg"}
               alt={imageAlt}
               className="w-full h-auto"
+              draggable="false"
             />
 
             {/* Drawing overlay */}

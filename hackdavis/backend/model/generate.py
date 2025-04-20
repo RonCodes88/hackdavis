@@ -164,9 +164,11 @@ def run_all(pred_image_name, crop_folder_name):
                 "label": label,
                 "box": [xA, yA, xB, yB]
             }
-        
-    print(d)
     return d
+
+def get_all_labels(d):
+    labels = [item["label"] for item in d.values()]
+    return ", ".join(labels)
 
 def get_all_pantry_items_from_full_image(image_path):
     with open(image_path, "rb") as f:

@@ -4,8 +4,7 @@ import { useRouter } from "next/navigation";
 import { ImageUpload } from "@/components/ui/image-processor";
 import ExampleUsagePage from "@/components/ui/image-page";
 import { FaExclamationTriangle } from "react-icons/fa";
-import { Button } from "@/components/ui/button";
-
+import RecipePage from "@/components/recipe";
 // Define the emergency request type
 interface EmergencyRequest {
   id: string;
@@ -35,6 +34,13 @@ export default function CaretakerPortal() {
     // Clean up the interval when component unmounts
     return () => clearInterval(intervalId);
   }, []);
+
+  const onGenerateRecipes = async () => {
+    const res = await fetch("http://localhost:8000/get-recipes");
+    const data = await res.json();
+    setActiveTab("recipes");
+    console.log(data);
+  };
 
   // Function to fetch emergency requests from backend
   const fetchEmergencyRequests = async () => {
@@ -104,7 +110,11 @@ export default function CaretakerPortal() {
             Manage Kitchen
           </button>
           <button
-            className="rounded-lg bg-gray-200 px-4 py-2 text-gray-700 hover:bg-gray-300"
+            className={`px-4 py-2 rounded-lg ${
+              activeTab === "upload"
+                ? "bg-red-500 text-white"
+                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+            }`}
             onClick={() => setActiveTab("upload")}
           >
             Upload
@@ -320,13 +330,13 @@ export default function CaretakerPortal() {
         )}
 
         {activeTab == "interact" && (
-          <div>
-            <ExampleUsagePage
-              onGenerateRecipes={() => setActiveTab("recipe")}
-              buttonText="Generate Recipes from Ingredients"
-            />
-          </div>
+          <ExampleUsagePage
+            onGenerateRecipes={() => onGenerateRecipes()}
+            buttonText="Generate Recipes from Ingredients"
+          />
         )}
+
+        {activeTab === "recipe" && <RecipePage />}
 
         {activeTab === "kitchen" && (
           <div className="container mx-auto">
