@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { ImageUpload } from "@/components/ui/image-processor";
 import ExampleUsagePage from "@/components/ui/image-page";
 import { FaExclamationTriangle } from "react-icons/fa";
-import RecipePage from "@/components/recipe";
+
 // Define the emergency request type
 interface EmergencyRequest {
   id: string;
@@ -335,8 +335,6 @@ export default function CaretakerPortal() {
             buttonText="Generate Recipes from Ingredients"
           />
         )}
-
-        {activeTab === "recipe" && <RecipePage />}
 
         {activeTab === "kitchen" && (
           <div className="container mx-auto">
