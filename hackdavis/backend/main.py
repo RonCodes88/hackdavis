@@ -35,11 +35,11 @@ app.add_middleware(
     allow_headers=["*"], 
 )
 
-client = Letta(base_url="http://localhost:8283")
+# client = Letta(base_url="http://localhost:8283")
 load_env()
 SUPABASE_URL=os.getenv("URL")
 SUPABASE_KEY=os.getenv("anon_public")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) 
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 class ResidentInfo(BaseModel):
     name: str
@@ -65,7 +65,6 @@ def login(request: LoginRequest):
     try:
         # Query the Supabase table for the resident with the given name and password
         result = supabase.table("residents").select("*").eq("name", request.name).eq("password", request.password).execute()
-
         if result.data and len(result.data) > 0:
             resident = result.data[0]
             agent_id = resident.get("agent_id")
@@ -92,12 +91,8 @@ def login(request: LoginRequest):
     except Exception as e:
         print(f"Error during login: {e}")
         raise HTTPException(status_code=500, detail="An error occurred during login")
-    
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello World"}
-
+# Modify the assign-caretaker endpoint
 @app.post("/assign-caretaker")
 def assign_caretaker(resident_info: ResidentInfo):
     print("I am here")
