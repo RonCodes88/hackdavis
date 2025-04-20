@@ -205,3 +205,12 @@ def get_dict(resident_info: ResidentInfo, ingredients_str: str, meal_type: str =
     recipe_dict = json.loads(cleaned_string)
     return recipe_dict
 
+
+def text_to_dict(text: str) -> dict:
+    start = text.find('{')
+    end = text.rfind('}') + 1
+
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError("No valid JSON object found")
+
+    return json.loads(text[start:end])
