@@ -5,12 +5,11 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   HeartPulse,
   Apple,
@@ -50,10 +49,10 @@ export default function Home() {
                 Contact
               </Link>
               <Button size="sm" asChild>
-                  <Link href="/select-role">
-                    Get Started
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Link>
+                <Link href="/select-role">
+                  Get Started
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Link>
               </Button>
             </nav>
           </div>
@@ -65,8 +64,8 @@ export default function Home() {
             <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
-                  <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
-                    Personalized AI Assistant Caretaker
+                  <h1 className="text-6xl font-bold tracking-tighter sm:text-5xl xl:text-7xl/none">
+                    InstaCare
                   </h1>
                   <p className="max-w-[600px] text-gray-500 md:text-xl">
                     Treat yourself with the care you deserve
@@ -116,7 +115,10 @@ export default function Home() {
                   <CardTitle>Personal Meal Recommendations</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-500">Receive catered meal recommendations based on the patients current health condition.</p>
+                  <p className="text-gray-500">
+                    Receive catered meal recommendations based on the patients
+                    current health condition.
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -127,7 +129,10 @@ export default function Home() {
                   <CardTitle>AI Models</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-500">We utilize Claude, Vectera, and Computer Vision to give users the best possible experience.</p>
+                  <p className="text-gray-500">
+                    We utilize Claude, Vectera, and Computer Vision to give
+                    users the best possible experience.
+                  </p>
                 </CardContent>
               </Card>
               <Card>
@@ -138,7 +143,10 @@ export default function Home() {
                   <CardTitle>Good for Caretakers</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-gray-500">Receive advice and personal recommendations to treat every patient with the utmost of care.</p>
+                  <p className="text-gray-500">
+                    Receive advice and personal recommendations to treat every
+                    patient with the utmost of care.
+                  </p>
                 </CardContent>
               </Card>
             </div>
@@ -164,7 +172,10 @@ export default function Home() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Alice</CardTitle>
-                      <CardDescription>I wanna kiss whoever made this</CardDescription>
+                      <CardDescription>
+                        The personalized care system has significantly improved
+                        my daily routine and well-being.
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <Image
@@ -179,7 +190,10 @@ export default function Home() {
                   <Card>
                     <CardHeader>
                       <CardTitle>Bob</CardTitle>
-                      <CardDescription>Very cool</CardDescription>
+                      <CardDescription>
+                        I appreciate the attentive service and innovative
+                        features that have made managing my health easier.
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <Image
@@ -190,12 +204,14 @@ export default function Home() {
                         className="rounded-lg object-cover w-full h-40 mb-4"
                       />
                     </CardContent>
-
                   </Card>
                   <Card>
                     <CardHeader>
                       <CardTitle>Trudy</CardTitle>
-                      <p>Very cool 👍 Dodged death gg</p>
+                      <CardDescription>
+                        The emergency response system has been a lifesaver.
+                        I&apos;m grateful for the peace of mind it provides.
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
                       <Image
@@ -209,7 +225,6 @@ export default function Home() {
                   </Card>
                 </div>
               </TabsContent>
-              
             </Tabs>
           </div>
         </section>
@@ -229,7 +244,7 @@ export default function Home() {
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Button size="lg">Contact</Button>
                   <Button size="lg" variant="outline">
-                    Don&apos; know what to put here.
+                    Need Help?
                   </Button>
                 </div>
               </div>
@@ -245,20 +260,7 @@ export default function Home() {
                   <div className="grid gap-2">
                     <Input type="Email" placeholder="Email" />
                   </div>
-                  <div className="grid gap-2">
-                    <select
-                      defaultValue=""
-                      className="flex h-10 w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <option value="" disabled>
-                        Select dropdown placeholder
-                      </option>
-                      <option value="option1">Option 1</option>
-                      <option value="option2">Option 2</option>
-                      <option value="option3">Option 3</option>
-                      <option value="option4">Option 4</option>
-                    </select>
-                  </div>
+
                   <Button type="submit">Submit Button</Button>
                 </form>
               </div>
@@ -271,7 +273,7 @@ export default function Home() {
           <div className="flex flex-col gap-2">
             <div className="flex gap-2 items-center text-lg font-bold text-red-600">
               <HeartPulse className="h-6 w-6" />
-              <span>AI Care</span>
+              <span>InstaCare</span>
             </div>
             <p className="text-sm text-gray-500">Get the care you deserve.</p>
           </div>
@@ -280,22 +282,38 @@ export default function Home() {
               <h4 className="text-sm font-medium">Our LinkedIn</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link href="https://www.linkedin.com/in/kennyiscool/" target="_blank" className="text-gray-500 hover:text-gray-900">
+                  <Link
+                    href="https://www.linkedin.com/in/kennyiscool/"
+                    target="_blank"
+                    className="text-gray-500 hover:text-gray-900"
+                  >
                     Kenny Nguyen
                   </Link>
                 </li>
                 <li>
-                  <Link href="https://www.linkedin.com/in/ronaldliyh/" target="_blank" className="text-gray-500 hover:text-gray-900">
+                  <Link
+                    href="https://www.linkedin.com/in/ronaldliyh/"
+                    target="_blank"
+                    className="text-gray-500 hover:text-gray-900"
+                  >
                     Ronald Li
                   </Link>
                 </li>
                 <li>
-                  <Link href="https://www.linkedin.com/in/saiwong100/" target="_blank" className="text-gray-500 hover:text-gray-900">
+                  <Link
+                    href="https://www.linkedin.com/in/saiwong100/"
+                    target="_blank"
+                    className="text-gray-500 hover:text-gray-900"
+                  >
                     Sai Wong
                   </Link>
                 </li>
                 <li>
-                  <Link href="https://www.linkedin.com/in/jauyong4/" target="_blank" className="text-gray-500 hover:text-gray-900">
+                  <Link
+                    href="https://www.linkedin.com/in/jauyong4/"
+                    target="_blank"
+                    className="text-gray-500 hover:text-gray-900"
+                  >
                     Johnathan Auyoung
                   </Link>
                 </li>
@@ -305,26 +323,41 @@ export default function Home() {
               <h4 className="text-sm font-medium">Contact us via email</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link href="#" target="_blank" className="text-gray-500 hover:text-gray-900">
+                  <Link
+                    href="#"
+                    target="_blank"
+                    className="text-gray-500 hover:text-gray-900"
+                  >
                     Skennymon@gmail.com
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" target="_blank" className="text-gray-500 hover:text-gray-900">
-                    mr.saiwong@gmail.com
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" target="_blank" className="text-gray-500 hover:text-gray-900">
+                  <Link
+                    href="#"
+                    target="_blank"
+                    className="text-gray-500 hover:text-gray-900"
+                  >
                     ronaldliyh@gmail.com
                   </Link>
                 </li>
                 <li>
-                  <Link href="#" target="_blank" className="text-gray-500 hover:text-gray-900">
+                  <Link
+                    href="#"
+                    target="_blank"
+                    className="text-gray-500 hover:text-gray-900"
+                  >
+                    mr.saiwong@gmail.com
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="#"
+                    target="_blank"
+                    className="text-gray-500 hover:text-gray-900"
+                  >
                     jauyong1011@gmail.com
                   </Link>
                 </li>
-                
               </ul>
             </div>
             <div className="space-y-2">
@@ -337,22 +370,21 @@ export default function Home() {
                 </li>
                 <li>
                   <Link href="#" className="text-gray-500 hover:text-gray-900">
+                    Ronald Li
+                  </Link>
+                </li>
+                <li>
+                  <Link href="#" className="text-gray-500 hover:text-gray-900">
                     Sai Wong
                   </Link>
                 </li>
                 <li>
                   <Link href="#" className="text-gray-500 hover:text-gray-900">
-                    Yi Hao (Ronald)
-                  </Link>
-                </li>
-                <li>
-                  <Link href="#" className="text-gray-500 hover:text-gray-900">
-                      Yi Hao (Ronald)
+                    Jonathan Auyong
                   </Link>
                 </li>
               </ul>
             </div>
-            
           </div>
         </div>
       </footer>

@@ -61,7 +61,7 @@ def get_docsearch_for_resident(resident_id):
         filter={"resident_id": resident_id}
     )
 
-    init_pinecone_index(index_name)
+    init_pinecone_index(INDEX_NAME)
     
     return docsearch
     

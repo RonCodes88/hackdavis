@@ -21,6 +21,7 @@ from langchain.chains.question_answering import load_qa_chain
 from langchain_cerebras import ChatCerebras
 from langchain_pinecone import PineconeVectorStore
 import asyncio
+from twilio.rest import Client
 
 from recipe_generator import get_dict
 
@@ -72,6 +73,19 @@ class EmergencyRequest(BaseModel):
     residentName: str
     timestamp: str
     emergencyType: str
+    description: Optional[str] = None
+
+class NonEmergencyRequest(BaseModel):
+    residentId: str
+    residentName: str
+    timestamp: str
+    description: Optional[str] = None
+    
+class CallRequest(BaseModel):
+    residentId: str
+    residentName: str
+    contactName: str
+    phoneNumber: str
 
 @app.post("/login")
 def login(request: LoginRequest):
@@ -329,6 +343,7 @@ async def handle_emergency_request(request: EmergencyRequest, background_tasks: 
             "resident_name": request.residentName,
             "timestamp": request.timestamp,
             "emergency_type": request.emergencyType,
+            "emergency_description": request.description,
             "status": "PENDING"  
         }
         
@@ -357,6 +372,42 @@ async def handle_emergency_request(request: EmergencyRequest, background_tasks: 
         return {
             "success": False,
             "message": "Error processing request, but staff has been notified through backup systems",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat()
+        }
+
+@app.post("/request-non-emergency-care")
+async def request_non_emergency_care(request: NonEmergencyRequest):
+    try:
+        print(f"NON-EMERGENCY CARE REQUEST from {request.residentName} (ID: {request.residentId})")
+        print(f"Timestamp: {request.timestamp}")
+        print(f"Description: {request.description}")
+        
+        # Log the care request in a non_emergency_logs table
+        care_request = {
+            "resident_id": request.residentId,
+            "resident_name": request.residentName,
+            "timestamp": request.timestamp,
+            "description": request.description,
+            "status": "PENDING"
+        }
+        
+        care_result = supabase.table("non_emergency_logs").insert(care_request).execute()
+        
+        return {
+            "success": True,
+            "message": "Care request received",
+            "timestamp": datetime.now().isoformat(),
+            "tracking_id": care_result.data[0]["id"] if care_result.data else None
+        }
+    except Exception as e:
+        print(f"Error processing care request: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "success": False,
+            "message": "Error processing care request",
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         }
@@ -706,6 +757,32 @@ async def get_residents_info():
         # Handle any errors that occur during the query
         return {"success": False, "error": str(e)}
 
+@app.post("/update-resident-profile")
+async def update_resident_profile(resident_data: dict):
+    try:
+        resident_id = resident_data.get("resident_id")
+        
+        if not resident_id:
+            return {"success": False, "message": "Missing resident ID"}
+            
+        # Update the resident profile in Supabase
+        response = supabase.table("residents").update({
+            "name": resident_data.get("name"),
+            "age": resident_data.get("age"),
+            "medical_conditions": resident_data.get("medicalConditions"),
+            "medications": resident_data.get("medications"),
+            "food_allergies": resident_data.get("foodAllergies"),
+            "special_supportive_services": resident_data.get("specialSupportiveServices")
+        }).eq("id", resident_id).execute()
+        
+        if response.data:
+            return {"success": True, "message": "Profile updated successfully"}
+        else:
+            return {"success": False, "message": "Failed to update profile"}
+            
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+    
 @app.get("/get_emergency_requests")
 async def get_emergency_requests():
     try:
@@ -809,7 +886,6 @@ async def notify_status_update(emergency_data):
             })
         except Exception as e:
             print(f"Error notifying client of status update: {e}")
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
