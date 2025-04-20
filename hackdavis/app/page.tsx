@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import {
   HeartPulse,
-  Apple,
+  ThumbsUp,
   Salad,
   Utensils,
   ChevronRight,
@@ -64,11 +64,11 @@ export default function Home() {
             <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
               <div className="flex flex-col justify-center space-y-4">
                 <div className="space-y-2">
-                  <h1 className="text-6xl font-bold tracking-tighter sm:text-5xl xl:text-7xl/none">
+                  <h1 className="text-7xl font-bold tracking-tighter sm:text-6xl xl:text-8xl">
                     InstaCare
                   </h1>
-                  <p className="max-w-[600px] text-gray-500 md:text-xl">
-                    Treat yourself with the care you deserve
+                  <p className="max-w-[700px] text-gray-600 text-2xl md:text-3xl">
+                    Treat seniors with the care they deserve.
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
@@ -77,9 +77,6 @@ export default function Home() {
                       Get Started
                       <ChevronRight className="ml-2 h-4 w-4" />
                     </Link>
-                  </Button>
-                  <Button size="lg" variant="outline">
-                    About
                   </Button>
                 </div>
               </div>
@@ -109,20 +106,6 @@ export default function Home() {
             <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3 lg:gap-12">
               <Card>
                 <CardHeader className="flex flex-row items-center gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 p-3">
-                    <Apple className="h-6 w-6 text-red-700" />
-                  </div>
-                  <CardTitle>Personal Meal Recommendations</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-500">
-                    Receive catered meal recommendations based on the patients
-                    current health condition.
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
                     <Salad className="h-6 w-6 text-red-700" />
                   </div>
@@ -130,11 +113,12 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-gray-500">
-                    We utilize Claude, Vectera, and Computer Vision to give
-                    users the best possible experience.
+                    We utilize Cerebras AI/ML and YOLO CV to give users the best
+                    possible experience.
                   </p>
                 </CardContent>
               </Card>
+
               <Card>
                 <CardHeader className="flex flex-row items-center gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
@@ -146,6 +130,20 @@ export default function Home() {
                   <p className="text-gray-500">
                     Receive advice and personal recommendations to treat every
                     patient with the utmost of care.
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 p-3">
+                    <ThumbsUp className="h-6 w-6 text-red-700" />
+                  </div>
+                  <CardTitle>Personal Meal Recommendations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-gray-500">
+                    Receive catered meal recommendations based on the patients
+                    current health condition.
                   </p>
                 </CardContent>
               </Card>
@@ -275,7 +273,9 @@ export default function Home() {
               <HeartPulse className="h-6 w-6" />
               <span>InstaCare</span>
             </div>
-            <p className="text-sm text-gray-500">Get the care you deserve.</p>
+            <p className="text-sm text-gray-500">
+              Get seniors the care they deserve.
+            </p>
           </div>
           <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="space-y-2">
