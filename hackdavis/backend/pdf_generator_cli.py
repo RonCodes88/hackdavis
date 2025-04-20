@@ -6,6 +6,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
 from reportlab.lib.units import inch
 import argparse
+from cerebras.cloud.sdk import Cerebras
 
 # Create pdfs directory if it doesn't exist
 PDF_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pdfs")
@@ -158,41 +159,38 @@ if __name__ == "__main__":
     if args.demo:
         # Sample patient data for demo
         sample_patient = {
-            "clinic_name": "Comprehensive Health Clinic",
-            "first_name": "John",
-            "last_name": "Doe",
-            "dob": "01/15/1975",
-            "gender": "Male",
-            "mrn": "MRN12345678",
-            "phone": "(555) 123-4567",
-            "email": "john.doe@email.com",
-            "chief_complaint": "Persistent cough for 2 weeks with mild fever.",
-            "present_illness": "Patient reports developing a dry cough approximately 2 weeks ago, which has since become productive with clear sputum. Low-grade fever (99.5°F-100.2°F) intermittently present. No chest pain or shortness of breath. Patient has been taking over-the-counter cough suppressants with minimal relief.",
-            "past_medical_history": [
-                "Hypertension (diagnosed 2015)",
-                "Type 2 Diabetes (diagnosed 2018)",
-                "Appendectomy (2010)"
-            ],
-            "medications": [
-                "Lisinopril 10mg daily",
-                "Metformin 500mg twice daily",
-                "Aspirin 81mg daily",
-                "Multivitamin once daily"
-            ],
-            "allergies": [
-                "Penicillin (hives)",
-                "Sulfa drugs (rash)"
-            ],
-            "family_history": "Father: Hypertension, died at 72 from stroke. Mother: Type 2 diabetes, alive at 68. Brother: Asthma.",
-            "social_history": "Married with 2 children. Works as an accountant. Former smoker (quit 5 years ago, 10 pack-year history). Social alcohol use (2-3 drinks per week). Exercises 2-3 times weekly.",
-            "immunization_history": [
-                "Influenza vaccine (10/2024)",
-                "Tdap (2020)",
-                "Pneumococcal vaccine (2022)",
-                "COVID-19 vaccine series completed (2021) with booster (2024)"
-            ],
-            "review_of_systems": "General: Reports fatigue but no weight loss or night sweats. Respiratory: Cough, no shortness of breath or chest pain. Cardiovascular: No palpitations or edema. Gastrointestinal: No nausea, vomiting, or changes in bowel habits. Neurological: No headaches or dizziness. Musculoskeletal: No joint pain or swelling."
-        }
+            
+           
+        "clinic_name": "East Bay Women’s Health",
+        "first_name": "Jasmine",
+        "last_name": "Ali",
+        "dob": "09/12/1995",
+        "gender": "Female",
+        "mrn": "MRN56789012",
+        "phone": "(510) 321-4567",
+        "email": "jasmine.ali@gmail.com",
+        "chief_complaint": "Irregular menstrual cycles and acne flare-ups.",
+        "present_illness": "Reports cycles varying between 35–60 days, associated with increased facial acne and weight gain over the last year.",
+        "past_medical_history": [
+        "PCOS (diagnosed 2021)"
+        ],
+        "medications": [
+        "Oral contraceptive (Ethinyl estradiol/norgestimate)",
+        "Spironolactone 50mg daily"
+        ],
+        "allergies": [
+        "Latex (skin irritation)"
+        ],
+        "family_history": "Mother: Hypothyroidism. Father: Obesity and high cholesterol. Younger brother: Healthy.",
+        "social_history": "Single. Graduate student. No tobacco. Drinks coffee daily. No alcohol or recreational drugs. Yoga 1–2 times a week.",
+        "immunization_history": [
+        "HPV vaccine series completed (2014)",
+        "Influenza vaccine (2024)",
+        "COVID-19 vaccines up to date"
+        ],
+        "review_of_systems": "Endocrine: Reports acne, weight gain. GI: Normal. General: No fatigue or fever. GYN: Irregular menses."
+  }
+  
         
         # Generate a default filename if none is provided
         if args.output is None:

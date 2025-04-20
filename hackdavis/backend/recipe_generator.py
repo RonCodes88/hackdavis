@@ -1,12 +1,24 @@
-from pydantic import BaseModel
-from caretaker_manager import create_caretaker_agent
-from typing import Optional
 import os
+import io
+import re
+import json
+import contextlib
+from collections import Counter
+from typing import Optional, Dict, List
+
+from pydantic import BaseModel
+
 from supabase import create_client, Client
 from helper import load_env
 import anthropic
-from collections import Counter
+
 from cerebras.cloud.sdk import Cerebras
+from langchain_cerebras import ChatCerebras
+from langchain_community.tools import DuckDuckGoSearchRun, DuckDuckGoSearchResults
+from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
+from langchain.agents import initialize_agent, AgentExecutor, create_tool_calling_agent
+from langchain.tools import Tool
+from langchain_core.messages import SystemMessage, HumanMessage
 
 anthropic_client = anthropic.Anthropic()
 load_env()
@@ -28,6 +40,9 @@ def ingredients_str_parser(ingredients_str: str):
     counted_ingredients = Counter([ingredient.lower().strip() for ingredient in ingredients_str.split(',')])
     lines = [f"{ingredient}: {count}" for ingredient, count in counted_ingredients.items()]
     return "\n".join(lines)
+
+#print(ingredients_str_parser("Ichiban ramen noodles, dark chocolate peanut butter bar, whole grain pasta elbows, peanut butter, pasta sauce, white beans, Whole grain pasta elbows, chicken broth, ichiban ramen noodles"))
+
 
 # def generate_recipe(resident_info: ResidentInfo, ingredients_str: str, meal_type: str = None, substitution_allowed: bool = False):
 #     r_info_text = (
@@ -86,6 +101,10 @@ def ingredients_str_parser(ingredients_str: str):
 
 #Replace above with below when we get the cerebras API
 def generate_recipe(resident_info: ResidentInfo, ingredients_str: str, meal_type: str = None, substitution_allowed: bool = False):
+
+    if (meal_type is None):
+        meal_type = "N/A"
+
     r_info_text = (
     f"Name: {resident_info.name}, "
     f"Age: {resident_info.age}, "
@@ -116,11 +135,48 @@ def generate_recipe(resident_info: ResidentInfo, ingredients_str: str, meal_type
                 - Prefer simple, low-effort recipes suited to caretakers
                 - Assume the recipe is for one person unless otherwise noted. If I specify this is for multiple individuals, generate a scalable recipe or note the portions.
 
-                Please format your response with the following sections:
-                1. Recipe Name
-                2. Ingredients List (with quantities)
-                3. Instructions
-                4. Notes (Explain how this recipe addresses the individual's needs)
+                Return a JSON and ONLY a JSON (No other text) in this format so that I can convert it to a python dictionary easily:
+
+                recipe = {
+                    "id": 2,
+                    "name": "Low-Carb Pasta with Vegetables",
+                    "prepTime": "20 minutes",
+                    "servings": 1,
+                    "ingredients": [
+                        {"name": "pasta elbows (cooked)", "quantity": "1/2 cup"},
+                        {"name": "pasta sauce", "quantity": "1/2 cup"},
+                        {"name": "lettuce, chopped", "quantity": "1/2 cup"}
+                    ],
+                    "instructions": [
+                        "Cook the pasta elbows according to package instructions until al dente. Drain and set aside.",
+                        "Heat the pasta sauce in a pan over medium heat.",
+                        "Add the chopped lettuce to the pasta sauce and simmer until the lettuce is wilted.",
+                        "Combine the cooked pasta elbows with the pasta sauce and lettuce mixture.",
+                        "Serve hot."
+                    ],
+                    "notes": {
+                        "summary": "This recipe is designed to meet John's dietary needs while considering his medical conditions and food allergies.",
+                        "benefits": [
+                            {
+                                "title": "Diabetes-friendly",
+                                "description": "The portion of pasta is controlled to manage carbohydrate intake. Pasta sauce is a better choice than creamy sauces that might contain dairy or added sugars."
+                            },
+                            {
+                                "title": "Low sodium",
+                                "description": "The meal is low in sodium; if the pasta sauce contains high sodium, a low-sodium alternative is recommended."
+                            },
+                            {
+                                "title": "Dairy-free",
+                                "description": "This recipe avoids dairy products, making it safe for those with dairy allergies."
+                            },
+                            {
+                                "title": "Supports glucose management",
+                                "description": "Though it doesn’t affect insulin directly, controlling carbohydrate intake helps with blood glucose management, especially for someone on Metformin."
+                            }
+                        ]
+                    }
+                }
+
                 '''
             },
             {
@@ -130,19 +186,22 @@ def generate_recipe(resident_info: ResidentInfo, ingredients_str: str, meal_type
         ],
         temperature = 1.0,
         max_tokens = 1500,
-        model= 'llama-4-scout-17b-16e-instruct'
+        model= 'llama-3.3-70b'
     )
     return chat_completion.choices[0].message.content
    
+def extract_json_from_text(text: str) -> str:
+    start = text.find('{')
+    end = text.rfind('}') + 1
 
-test_resident = ResidentInfo(
-    name="John Doe",
-    password='Bruh',
-    age=78, 
-    medicalConditions="Diabetes, Hypertension", 
-    medications="Metformin, Lisinopril",
-    foodAllergies="Dairy",
-    specialSupportiveServices="Assistance with daily insulin shots")
+    if start == -1 or end == -1 or end <= start:
+        raise ValueError("No valid JSON object found")
 
-# print("This is the recipe below\n", generate_recipe(test_resident, "rice, cabbage, egg ,Egg", 'Dinner'), sep = '')
-print("This is the recipe below\n", generate_recipe(test_resident, "rice, carrot, tomato, egg, beef", 'Dinner'), sep = '')
+    return text[start:end]
+
+def get_dict(resident_info: ResidentInfo, ingredients_str: str, meal_type: str = None, substitution_allowed: bool = False):
+    recipe = generate_recipe(resident_info, ingredients_str)
+    cleaned_string = extract_json_from_text(recipe)
+    recipe_dict = json.loads(cleaned_string)
+    return recipe_dict
+

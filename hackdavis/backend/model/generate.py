@@ -150,7 +150,7 @@ def run_all(pred_image_name, crop_folder_name):
     shutil.copy(pred_path, output_path)
     imgs_path = os.path.join(image_dir, crop_folder_name)
     res = make_prediction(crop_folder_name, pred_path)
-    allowed_items = get_pantry_items_from_full_image(pred_path)
+    allowed_items = get_all_pantry_items_from_full_image(pred_path)
     cropped_images = get_all_image_files(imgs_path)
     j=0
     for i, img_path in enumerate(cropped_images):
@@ -164,9 +164,30 @@ def run_all(pred_image_name, crop_folder_name):
                 "label": label,
                 "box": [xA, yA, xB, yB]
             }
-        
-    print(d)
     return d
+
+def get_all_labels(d):
+    labels = [item["label"] for item in d.values()]
+    return ", ".join(labels)
+
+def get_all_pantry_items_from_full_image(image_path):
+    with open(image_path, "rb") as f:
+        image_data = base64.b64encode(f.read()).decode("utf-8")
+
+    response = client.messages.create(
+        model="claude-3-7-sonnet-20250219",  
+        max_tokens=1000,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": image_data}},
+                {"type": "text", "text": "Scan each food or pantry item in this image and list only FOODS as lower-case nouns separated by commas and repeat items if you see more than one. Be as specific as possible. Only include full/recognizable items."}
+            ]
+        }]
+    )
+    # Example response: "lettuce, tomato, milk, cheese"
+    return response.content[0].text.strip()
+
 
 
 

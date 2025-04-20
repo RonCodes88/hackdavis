@@ -34,6 +34,7 @@ export interface InteractiveImageViewerProps {
   // Optional callbacks
   onBoxRemoved?: (id: number) => void;
   onFiltersChanged?: (selectedLabels: string[]) => void;
+  onBoxAdded?: (boxData: BoxData) => void;
 }
 
 // Helper function to check if a point is inside a box
@@ -57,6 +58,7 @@ export function InteractiveImageViewer({
   title = "Interactive Image Viewer",
   onBoxRemoved,
   onFiltersChanged,
+  onBoxAdded,
 }: InteractiveImageViewerProps) {
   const [visibleBoxes, setVisibleBoxes] = useState<number[]>([]);
   const [uniqueLabels, setUniqueLabels] = useState<string[]>([]);
@@ -66,8 +68,17 @@ export function InteractiveImageViewer({
   const [showLayerPanel, setShowLayerPanel] = useState(false);
   const imageRef = useRef<HTMLDivElement>(null);
 
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStart, setDrawStart] = useState<[number, number] | null>(null);
+  const [drawEnd, setDrawEnd] = useState<[number, number] | null>(null);
+  const [isAddingLabel, setIsAddingLabel] = useState(false);
+  const [newBoxLabel, setNewBoxLabel] = useState("");
+  const [drawingMode, setDrawingMode] = useState(false);
+
   // Initialize visible boxes and unique labels
   useEffect(() => {
+    if (!detectionData) return;
+
     const boxIds = Object.keys(detectionData).map(Number);
     setVisibleBoxes(boxIds);
 
@@ -103,8 +114,11 @@ export function InteractiveImageViewer({
   };
 
   // Filter boxes based on selected labels
-  const filteredBoxes = visibleBoxes.filter((id) =>
-    selectedLabels.includes(detectionData[id].label)
+  const filteredBoxes = visibleBoxes.filter(
+    (id) =>
+      detectionData &&
+      detectionData[id] &&
+      selectedLabels.includes(detectionData[id].label)
   );
 
   // Handle image click to find and cycle through overlapping boxes
@@ -135,11 +149,105 @@ export function InteractiveImageViewer({
     }
   };
 
+  // Handle mouse down to start drawing
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!drawingMode || !imageRef.current) return;
+
+    // Get coordinates relative to the image
+    const rect = imageRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * imageWidth;
+    const y = ((e.clientY - rect.top) / rect.height) * imageHeight;
+
+    setIsDrawing(true);
+    setDrawStart([x, y]);
+    setDrawEnd([x, y]);
+  };
+
+  // Handle mouse move while drawing
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDrawing || !imageRef.current) return;
+
+    // Get coordinates relative to the image
+    const rect = imageRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * imageWidth;
+    const y = ((e.clientY - rect.top) / rect.height) * imageHeight;
+
+    setDrawEnd([x, y]);
+  };
+
+  // Handle mouse up to finish drawing
+  const handleMouseUp = () => {
+    if (!isDrawing) return;
+
+    setIsDrawing(false);
+
+    // Only show label input if we've drawn a box of reasonable size
+    if (drawStart && drawEnd) {
+      const width = Math.abs(drawEnd[0] - drawStart[0]);
+      const height = Math.abs(drawEnd[1] - drawStart[1]);
+
+      if (width > 10 && height > 10) {
+        setIsAddingLabel(true);
+      } else {
+        // Reset if the box is too small
+        setDrawStart(null);
+        setDrawEnd(null);
+      }
+    }
+  };
+
   // Move a box up or down in the stacking order
   const moveBoxInStack = (id: number, direction: "up" | "down") => {
     // This is a visual effect only - we're just changing the selected box
     // to bring it to the front or send it to the back
     setSelectedBox(id);
+  };
+
+  // Add a new box with label
+  const addNewBox = () => {
+    if (!drawStart || !drawEnd || !newBoxLabel.trim() || !detectionData) return;
+
+    // Create box coordinates in the format [xA, yA, xB, yB]
+    const box: [number, number, number, number] = [
+      Math.min(drawStart[0], drawEnd[0]),
+      Math.min(drawStart[1], drawEnd[1]),
+      Math.max(drawStart[0], drawEnd[0]),
+      Math.max(drawStart[1], drawEnd[1]),
+    ];
+
+    // Create new box data
+    const newBox: BoxData = {
+      label: newBoxLabel.trim(),
+      box: box,
+    };
+
+    // Generate a new unique ID (max ID + 1)
+    const newId =
+      Math.max(0, ...Object.keys(detectionData || {}).map(Number)) + 1;
+
+    // Add to detection data (this would typically be handled by the parent component)
+    const updatedData = {
+      ...detectionData,
+      [newId]: newBox,
+    };
+
+    // Update local state
+    if (!uniqueLabels.includes(newBoxLabel)) {
+      setUniqueLabels([...uniqueLabels, newBoxLabel]);
+      setSelectedLabels([...selectedLabels, newBoxLabel]);
+    }
+
+    // Add to visible boxes
+    setVisibleBoxes([...visibleBoxes, newId]);
+
+    // Notify parent component
+    onBoxAdded?.(newBox);
+
+    // Reset drawing state
+    setDrawStart(null);
+    setDrawEnd(null);
+    setNewBoxLabel("");
+    setIsAddingLabel(false);
   };
 
   return (
@@ -172,7 +280,8 @@ export function InteractiveImageViewer({
 
               <div className="mt-4 text-sm text-gray-500">
                 Showing {filteredBoxes.length} of{" "}
-                {Object.keys(detectionData).length} detected objects
+                {detectionData ? Object.keys(detectionData).length : 0} detected
+                objects
               </div>
             </div>
 
@@ -259,14 +368,41 @@ export function InteractiveImageViewer({
           <div
             ref={imageRef}
             className="relative border border-gray-200 rounded-lg overflow-hidden"
-            onClick={handleImageClick}
+            onClick={drawingMode ? undefined : handleImageClick}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={() => isDrawing && setIsDrawing(false)}
           >
             {/* The image */}
             <img
               src={imageSrc || "/placeholder.svg"}
               alt={imageAlt}
               className="w-full h-auto"
+              draggable="false"
             />
+
+            {/* Drawing overlay */}
+            {drawingMode && drawStart && drawEnd && (
+              <div
+                className="absolute border-2 border-dashed border-blue-500 bg-blue-100/30 pointer-events-none"
+                style={{
+                  left: `${
+                    (Math.min(drawStart[0], drawEnd[0]) / imageWidth) * 100
+                  }%`,
+                  top: `${
+                    (Math.min(drawStart[1], drawEnd[1]) / imageHeight) * 100
+                  }%`,
+                  width: `${
+                    (Math.abs(drawEnd[0] - drawStart[0]) / imageWidth) * 100
+                  }%`,
+                  height: `${
+                    (Math.abs(drawEnd[1] - drawStart[1]) / imageHeight) * 100
+                  }%`,
+                  zIndex: 2000,
+                }}
+              />
+            )}
 
             {/* Bounding boxes */}
             {filteredBoxes.map((id) => {
@@ -341,6 +477,73 @@ export function InteractiveImageViewer({
               );
             })}
           </div>
+
+          {/* Drawing mode toggle button */}
+          <div className="mt-4 flex justify-between items-center">
+            <button
+              className={`px-3 py-2 rounded-lg text-sm font-medium ${
+                drawingMode
+                  ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  : "bg-gray-100 hover:bg-gray-200"
+              }`}
+              onClick={() => {
+                setDrawingMode(!drawingMode);
+                setSelectedBox(null);
+                setDrawStart(null);
+                setDrawEnd(null);
+              }}
+            >
+              {drawingMode ? "Exit Drawing Mode" : "Add New Box"}
+            </button>
+
+            {drawingMode && (
+              <div className="text-sm text-gray-500">
+                Click and drag to draw a box
+              </div>
+            )}
+          </div>
+
+          {/* Label input modal */}
+          {isAddingLabel && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[2000]">
+              <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                <h3 className="text-lg font-bold mb-4">Add Label</h3>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1">
+                    Label for the selected area:
+                  </label>
+                  <input
+                    type="text"
+                    value={newBoxLabel}
+                    onChange={(e) => setNewBoxLabel(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter a label"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-md"
+                    onClick={() => {
+                      setIsAddingLabel(false);
+                      setDrawStart(null);
+                      setDrawEnd(null);
+                      setNewBoxLabel("");
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={addNewBox}
+                    disabled={!newBoxLabel.trim()}
+                  >
+                    Add Box
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 text-sm text-gray-500 space-y-1">
             <p>

@@ -65,7 +65,7 @@ export function ImageUpload({
     };
     reader.readAsDataURL(file);
 
-    const timer = setTimeout(() => {
+    setTimeout(() => {
       setIsUploading(false);
       setUploadSuccess(true);
 

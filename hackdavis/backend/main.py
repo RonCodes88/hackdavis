@@ -1,9 +1,9 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form, WebSocket, WebSocketDisconnect, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form, WebSocket, WebSocketDisconnect, BackgroundTasks, Request
 from fastapi.responses import FileResponse, JSONResponse
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import threading
 import os
 from supabase import create_client, Client
@@ -21,6 +21,9 @@ from langchain.chains.question_answering import load_qa_chain
 from langchain_cerebras import ChatCerebras
 from langchain_pinecone import PineconeVectorStore
 import asyncio
+
+from recipe_generator import get_dict
+
 
 # Define base directory and paths
 BASE_DIR = Path(__file__).parent
@@ -43,11 +46,13 @@ app.add_middleware(
 )
 
 load_env()
+
 SUPABASE_URL = os.getenv("URL")
 SUPABASE_SERVICE_KEY = os.getenv("service_role")
 CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+
 
 class ResidentInfo(BaseModel):
     name: str
@@ -73,7 +78,6 @@ def login(request: LoginRequest):
     try:
         # Query the Supabase table for the resident with the given name and password
         result = supabase.table("residents").select("*").eq("name", request.name).eq("password", request.password).execute()
-        
         if result.data and len(result.data) > 0:
             resident = result.data[0]
             agent_id = resident.get("agent_id")
@@ -242,10 +246,18 @@ async def serve_original_image(filename: str):  # Renamed function
     return FileResponse(str(file_path))
 
 
+detection_data = {1: {'label': 'pasta sauce', 'box': [290, 379, 396, 590]}, 2: {'label': 'pasta sauce', 'box': [391, 387, 497, 591]}, 3: {'label': 'peanut butter', 'box': [192, 683, 283, 852]}, 4: {'label': 'ichiban ramen noodles', 'box': [456, 55, 557, 288]}, 5: {'label': 'dark chocolate peanut butter bar', 'box': [490, 382, 597, 601]}, 6: {'label': 'peanut butter', 'box': [193, 620, 289, 772]}, 7: {'label': 'chicken broth', 'box': [329, 0, 465, 242]}, 8: {'label': 'whole grain pasta elbows', 'box': [35, 216, 136, 248]}, 9: {'label': 'chicken broth', 'box': [11, 617, 600, 897]}, 10: {'label': 'white beans', 'box': [181, 352, 303, 581]}, 11: {'label': 'whole grain pasta elbows', 'box': [157, 21, 327, 290]}, 12: {'label': 'chicken broth', 'box': [285, 624, 348, 851]}, 13: {'label': 'whole grain pasta elbows', 'box': [0, 114, 165, 288]}, 14: {'label': 'dark chocolate peanut butter bar', 'box': [485, 382, 598, 602]}, 15: {'label': 'dark chocolate peanut butter bar', 'box': [343, 622, 408, 849]}, 16: {'label': 'whole grain pasta elbows', 'box': [0, 0, 599, 766]}, 17: {'label': 'white beans', 'box': [184, 357, 303, 579]}, 18: {'label': 'ichiban ramen noodles', 'box': [458, 33, 595, 286]}, 19: {'label': 'whole grain pasta elbows', 'box': [0, 14, 327, 295]}, 20: {'label': 'whole grain pasta elbows', 'box': [33, 216, 136, 248]}, 21: {'label': 'Whole grain pasta elbows', 'box': [480, 332, 598, 378]}, 22: {'label': 'white beans', 'box': [184, 357, 302, 579]}, 23: {'label': 'Ichiban ramen noodles', 'box': [14, 311, 108, 381]}, 24: {'label': 'whole grain pasta elbows', 'box': [0, 29, 163, 289]}, 25: {'label': 'whole grain pasta elbows', 'box': [156, 115, 315, 283]}, 26: {'label': 'peanut butter', 'box': [322, 314, 489, 409]}, 27: {'label': 'chicken broth', 'box': [461, 31, 598, 222]}, 28: {'label': 'chicken broth', 'box': [45, 617, 192, 814]}}
+
+@app.get("/refresh-detections/{filename}")
+async def refresh_detections(filename: str):
+    global detection_data  # Reference the global variable
+    detection_data = {1: {'label': 'pasta sauce', 'box': [290, 379, 396, 590]}, 2: {'label': 'pasta sauce', 'box': [391, 387, 497, 591]}, 3: {'label': 'peanut butter', 'box': [192, 683, 283, 852]}, 4: {'label': 'ichiban ramen noodles', 'box': [456, 55, 557, 288]}, 5: {'label': 'dark chocolate peanut butter bar', 'box': [490, 382, 597, 601]}, 6: {'label': 'peanut butter', 'box': [193, 620, 289, 772]}, 7: {'label': 'chicken broth', 'box': [329, 0, 465, 242]}, 8: {'label': 'whole grain pasta elbows', 'box': [35, 216, 136, 248]}, 9: {'label': 'chicken broth', 'box': [11, 617, 600, 897]}, 10: {'label': 'white beans', 'box': [181, 352, 303, 581]}, 11: {'label': 'whole grain pasta elbows', 'box': [157, 21, 327, 290]}, 12: {'label': 'chicken broth', 'box': [285, 624, 348, 851]}, 13: {'label': 'whole grain pasta elbows', 'box': [0, 114, 165, 288]}, 14: {'label': 'dark chocolate peanut butter bar', 'box': [485, 382, 598, 602]}, 15: {'label': 'dark chocolate peanut butter bar', 'box': [343, 622, 408, 849]}, 16: {'label': 'whole grain pasta elbows', 'box': [0, 0, 599, 766]}, 17: {'label': 'white beans', 'box': [184, 357, 303, 579]}, 18: {'label': 'ichiban ramen noodles', 'box': [458, 33, 595, 286]}, 19: {'label': 'whole grain pasta elbows', 'box': [0, 14, 327, 295]}, 20: {'label': 'whole grain pasta elbows', 'box': [33, 216, 136, 248]}, 21: {'label': 'Whole grain pasta elbows', 'box': [480, 332, 598, 378]}, 22: {'label': 'white beans', 'box': [184, 357, 302, 579]}, 23: {'label': 'Ichiban ramen noodles', 'box': [14, 311, 108, 381]}, 24: {'label': 'whole grain pasta elbows', 'box': [0, 29, 163, 289]}, 25: {'label': 'whole grain pasta elbows', 'box': [156, 115, 315, 283]}, 26: {'label': 'peanut butter', 'box': [322, 314, 489, 409]}, 27: {'label': 'chicken broth', 'box': [461, 31, 598, 222]}, 28: {'label': 'chicken broth', 'box': [45, 617, 192, 814]}}
+    return detection_data
+
+
 @app.get("/get-detections/{filename}")
 async def get_detections(filename: str):
     # Example format
-    detection_data = {1: {'label': 'sauce', 'box': [290, 379, 396, 590]}, 2: {'label': 'sauce', 'box': [391, 387, 497, 591]}, 3: {'label': 'peanutbutter', 'box': [192, 683, 283, 852]}, 4: {'label': 'pasta', 'box': [80, 773, 188, 849]}, 5: {'label': 'pasta', 'box': [456, 55, 557, 288]}, 6: {'label': 'chocolate', 'box': [490, 382, 597, 601]}, 7: {'label': 'peanutbutter', 'box': [193, 620, 289, 772]}, 8: {'label': 'broth', 'box': [329, 0, 465, 242]}, 9: {'label': 'pasta', 'box': [35, 216, 136, 248]}, 10: {'label': 'noodles', 'box': [11, 617, 600, 897]}, 11: {'label': 'noodles', 'box': [191, 619, 289, 723]}, 12: {'label': 'beans', 'box': [181, 352, 303, 581]}, 13: {'label': 'elbows', 'box': [157, 21, 327, 290]}, 14: {'label': 'broth', 'box': [285, 624, 348, 851]}, 15: {'label': 'beans', 'box': [0, 308, 600, 891]}, 16: {'label': 'peanutbutter', 'box': [201, 221, 285, 253]}, 17: {'label': 'pasta', 'box': [210, 161, 257, 202]}, 18: {'label': 'elbows', 'box': [0, 114, 165, 288]}, 19: {'label': 'chocolate', 'box': [485, 382, 598, 602]}, 20: {'label': 'noodles', 'box': [343, 622, 408, 849]}, 21: {'label': 'pasta', 'box': [390, 197, 454, 268]}, 22: {'label': 'pasta', 'box': [0, 0, 599, 766]}, 23: {'label': 'beans', 'box': [4, 296, 600, 900]}, 24: {'label': 'pasta', 'box': [257, 223, 285, 252]}, 25: {'label': 'beans', 'box': [184, 357, 303, 579]}, 26: {'label': 'pasta', 'box': [458, 33, 595, 286]}, 27: {'label': 'pasta', 'box': [56, 155, 105, 196]}, 28: {'label': 'elbows', 'box': [0, 14, 327, 295]}, 29: {'label': 'elbows', 'box': [33, 216, 136, 248]}, 30: {'label': 'elbows', 'box': [480, 332, 598, 378]}, 31: {'label': 'sauce', 'box': [363, 247, 390, 270]}, 32: {'label': 'beans', 'box': [184, 357, 302, 579]}, 33: {'label': 'sauce', 'box': [14, 311, 108, 381]}, 34: {'label': 'ramen', 'box': [131, 802, 184, 834]}, 35: {'label': 'elbows', 'box': [0, 29, 163, 289]}, 36: {'label': 'elbows', 'box': [156, 115, 315, 283]}, 37: {'label': 'noodles', 'box': [322, 314, 489, 409]}, 38: {'label': 'pasta', 'box': [461, 31, 598, 222]}, 39: {'label': 'broth', 'box': [45, 617, 192, 814]}}
     
     return detection_data
 
@@ -275,6 +287,30 @@ async def websocket_endpoint(websocket: WebSocket):
             # Handle client messages if needed
     except WebSocketDisconnect:
         active_connections.remove(websocket)
+
+class BoxData(BaseModel):
+    label: str
+    box: List[int]
+
+@app.post("/add-detection/{filename}")
+async def add_detection(filename: str, request: Request):
+    body = await request.json()
+    new_id = body["id"]
+    data = body["data"]
+    detection_data[new_id] = {
+        "label": data["label"],
+        "box": data["box"]
+    }
+    return {"message": "Detection added", "id": new_id}
+
+@app.delete("/remove-detection/{id}")
+async def remove_detection(id: int):
+    print(detection_data)
+    if id in detection_data:
+        del detection_data[id]
+        return {"message": f"Detection with ID {id} removed"}
+    else:
+        raise HTTPException(status_code=404, detail="Detection not found")
 
 @app.post("/push-emergency-request")
 async def handle_emergency_request(request: EmergencyRequest, background_tasks: BackgroundTasks):
@@ -604,6 +640,105 @@ async def upload_medical_history_pdf(
             }
         )
 
+@app.get("/get-resident-info/{resident_name}") 
+async def get_resident_info(resident_name: str):
+    try:
+        # Query the resident information from Supabase using the name
+        result = supabase.table("residents").select("*").eq("name", resident_name).execute()
+        
+        if not result.data or len(result.data) == 0:
+            return {"success": False, "message": f"Resident with name {resident_name} not found"}
+            
+        # Get the first matching resident
+        resident = result.data[0]        
+        # Now use this resident_id for your recipe generation logic
+        # (replacing your existing recipe generation code with the resident-specific logic)
+      #  recipes = get_dict(resident, "ingredients_from_image", "Dinner")
+        return {
+            "age": resident.get("age"),
+            "medical_conditions": resident.get("medical_conditions"),
+            "medications": resident.get("medications"),
+            "food_allergies": resident.get("food_allergies"),
+            "special_supportive_services": resident.get("special_supportive_services"),
+        }
+    
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "message": f"Error generating recipes: {str(e)}"}
+
+@app.get("/get-residents-info")
+async def get_residents_info():
+    try:
+        # Query all residents from the residents table
+        result = supabase.table("residents").select(
+            "name",
+            "age",
+            "medical_conditions",
+            "medications", 
+            "food_allergies",
+            "special_supportive_services"
+        ).execute()
+        
+        # Return the data from the query
+        residents = result.data
+        return {"success": True, "residents": residents}
+    
+    except Exception as e:
+        # Handle any errors that occur during the query
+        return {"success": False, "error": str(e)}
+
+@app.get("/get_emergency_requests")
+async def get_emergency_requests():
+    try:
+        result = supabase.table("emergency_logs").select("*").order("timestamp", desc=True).execute()
+        
+        print(f"Retrieved {len(result.data) if result.data else 0} emergency requests")
+        
+        if result.data:
+            return {"requests": result.data}
+        else:
+            return {"requests": []}
+            
+    except Exception as e:
+        print(f"Error fetching emergency requests: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return an error response
+        raise HTTPException(
+            status_code=500, 
+            detail="Failed to fetch emergency requests"
+        )
+    
+def get_all_labels(d):
+    labels = [item["label"] for item in d.values()]
+    return ",".join(labels)
+
+@app.get("/get-recipes-by-name/{resident_name}")
+async def get_recipes_by_name(resident_name: str):
+    try:
+        data = await get_resident_info(resident_name) 
+        unique_foods = get_all_labels(detection_data)
+
+        resident_info = ResidentInfo(
+            name=resident_name,
+            password="",
+            age=data.get("age"),
+            medicalConditions=data.get("medical_conditions"),
+            medications=data.get("medications"),
+            foodAllergies=data.get("food_allergies"),
+            specialSupportiveServices=data.get("special_supportive_services"),
+        )
+        d = get_dict(resident_info, unique_foods)
+        return d
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "message": f"Error generating recipes: {str(e)}"}
+    
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
